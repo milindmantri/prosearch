@@ -5,6 +5,10 @@ import static java.sql.ResultSet.CONCUR_UPDATABLE;
 import static java.util.Objects.requireNonNull;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 import com.norconex.collector.core.store.DataStoreException;
 import com.norconex.collector.core.store.IDataStore;
 import java.io.IOException;
@@ -14,6 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 
@@ -25,7 +30,38 @@ import java.util.function.BiPredicate;
  */
 public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
 
-  private static final Gson GSON = new Gson();
+  // Required for ZoneId which was failing when as it didn't allow empty constructor for init
+  static class ZoneIdAdapter extends TypeAdapter<ZoneId> {
+
+    @Override
+    public void write(final JsonWriter out, final ZoneId value) throws IOException {
+      out.beginObject();
+      out.name("id");
+
+      if (value == null) {
+        out.nullValue();
+      } else {
+        out.value(value.getId());
+      }
+
+      out.endObject();
+    }
+
+    @Override
+    public ZoneId read(final JsonReader in) throws IOException {
+      in.beginObject();
+      if (in.hasNext()) {
+        var str = in.nextString();
+        in.endObject();
+        return ZoneId.of(str);
+      }
+
+      return null;
+    }
+  }
+
+  private static final Gson GSON =
+      new GsonBuilder().registerTypeAdapter(ZoneId.class, new ZoneIdAdapter()).create();
   private static final ProsearchJdbcDataStore.PreparedStatementConsumer NO_ARGS = stmt -> {};
 
   private final ProsearchJdbcDataStoreEngine engine;
@@ -245,8 +281,6 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   }
 
   private Optional<T> toObject(String str) throws IOException {
-    System.out.println(str);
-    System.out.println(type);
     return Optional.ofNullable(GSON.fromJson(str, type));
   }
 
@@ -262,6 +296,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
       try (PreparedStatement stmt =
           conn.prepareStatement(
               sql.replace("<table>", tableName),
+              // Requires scrollable type but wasn't set in original store
               ResultSet.TYPE_SCROLL_INSENSITIVE,
               CONCUR_UPDATABLE)) {
         psc.accept(stmt);
@@ -277,7 +312,6 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   private int executeWrite(String sql, ProsearchJdbcDataStore.PreparedStatementConsumer c) {
     try (Connection conn = engine.getConnection()) {
       try (PreparedStatement stmt = conn.prepareStatement(sql.replace("<table>", tableName))) {
-        System.out.println(stmt.toString());
         c.accept(stmt);
         int val = stmt.executeUpdate();
         if (!conn.getAutoCommit()) {
