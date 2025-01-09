@@ -1,11 +1,15 @@
 package com.milindmantri;
 
+import com.norconex.collector.core.filter.IMetadataFilter;
+import com.norconex.collector.core.filter.impl.MetadataFilter;
 import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
+import com.norconex.commons.lang.text.TextMatcher;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class Main {
 
@@ -28,6 +32,9 @@ public class Main {
     urlCrawlScope.setStayOnDomain(true);
     urlCrawlScope.setIncludeSubdomains(false);
     crawlerConfig.setUrlCrawlScopeStrategy(urlCrawlScope);
+
+    crawlerConfig.setFetchHttpHead(true);
+    crawlerConfig.setMetadataFilters(getTextOnlyMetadataFilters().toList());
 
     try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine()) {
 
@@ -52,5 +59,17 @@ public class Main {
     props.put("password", List.of("pass"));
 
     return new com.norconex.commons.lang.map.Properties(props);
+  }
+
+  private static Stream<IMetadataFilter> getTextOnlyMetadataFilters() {
+    return Stream.of("text/html", "application/xhtml+xml", "text/plain")
+        .map(t -> t + "*")
+        .mapMulti(
+            (t, c) -> {
+              c.accept(
+                  new MetadataFilter(TextMatcher.basic("Content-Type"), TextMatcher.wildcard(t)));
+              c.accept(
+                  new MetadataFilter(TextMatcher.basic("content-type"), TextMatcher.wildcard(t)));
+            });
   }
 }
