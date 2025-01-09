@@ -6,9 +6,6 @@ import static java.util.Objects.requireNonNull;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
 import com.norconex.collector.core.store.DataStoreException;
 import com.norconex.collector.core.store.IDataStore;
 import java.io.IOException;
@@ -29,36 +26,6 @@ import java.util.function.BiPredicate;
  * @param <T>
  */
 public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
-
-  // Required for ZoneId which was failing when as it didn't allow empty constructor for init
-  static class ZoneIdAdapter extends TypeAdapter<ZoneId> {
-
-    @Override
-    public void write(final JsonWriter out, final ZoneId value) throws IOException {
-      out.beginObject();
-      out.name("id");
-
-      if (value == null) {
-        out.nullValue();
-      } else {
-        out.value(value.getId());
-      }
-
-      out.endObject();
-    }
-
-    @Override
-    public ZoneId read(final JsonReader in) throws IOException {
-      in.beginObject();
-      if (in.hasNext()) {
-        var str = in.nextString();
-        in.endObject();
-        return ZoneId.of(str);
-      }
-
-      return null;
-    }
-  }
 
   private static final Gson GSON =
       new GsonBuilder().registerTypeAdapter(ZoneId.class, new ZoneIdAdapter()).create();
