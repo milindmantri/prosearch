@@ -162,7 +162,6 @@ public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfi
       names.stream().forEach(this::dropStore);
     }
     dropStore(STORE_TYPES_NAME);
-    close();
     return hasStores;
   }
 
@@ -226,9 +225,14 @@ public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfi
       try (ResultSet rs = conn.getMetaData().getTables(null, null, "%", new String[] {"TABLE"})) {
         while (rs.next()) {
           String tableName = rs.getString(3);
-          if (startsWithIgnoreCase(tableName, tablePrefix)) {
+
+          // Fixed: There's a tableName() helper used to create table names and also replaces stuff
+          // in the original table name. Using tablePrefix directly is incorrect since it may pose
+          // problems because stuff replacement has not been done in tablePrefix, so it may never
+          // find the table to drop.
+          if (startsWithIgnoreCase(tableName, tableNameModifier(tablePrefix))) {
             // only add if not the table holding store types
-            String storeName = removeStart(tableName, tablePrefix);
+            String storeName = removeStart(tableName, tableNameModifier(tablePrefix));
             if (!STORE_TYPES_NAME.equalsIgnoreCase(storeName)) {
               names.add(storeName);
             }
@@ -303,9 +307,15 @@ public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfi
 
   String tableName(String storeName) {
     String n = tablePrefix + storeName.trim();
-    n = n.replaceFirst("(?i)^[^a-z]", "x");
-    n = n.replaceAll("\\W+", "_");
-    return n;
+    return tableNameModifier(n);
+  }
+
+  String tableNameModifier(String name) {
+    String modified = "" + name;
+    modified = modified.replaceFirst("(?i)^[^a-z]", "x");
+    modified = modified.replaceAll("\\W+", "_");
+
+    return modified;
   }
 
   boolean tableExist(String tableName) {

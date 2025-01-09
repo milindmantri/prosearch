@@ -20,7 +20,7 @@ public class Main {
     HttpCrawlerConfig crawlerConfig = new HttpCrawlerConfig();
 
     // TODO: pass list of all URLs to crawl
-    crawlerConfig.setStartURLs("https://www.php.net");
+    crawlerConfig.setStartURLs("https://www.php.net", "https://elm-lang.org");
     crawlerConfig.setId("test-crawler");
 
     // TODO: What about the case for redirected domains, like openjdk.java.net
@@ -37,6 +37,10 @@ public class Main {
       config.setCrawlerConfigs(crawlerConfig);
 
       HttpCollector spider = new HttpCollector(config);
+
+      // TODO: Remove once testing is complete
+      spider.clean();
+
       spider.start();
     }
   }
