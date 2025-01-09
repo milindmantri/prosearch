@@ -26,8 +26,7 @@ import java.util.function.BiPredicate;
 public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
 
   private static final Gson GSON = new Gson();
-  private static final ProsearchJdbcDataStore.PreparedStatementConsumer NO_ARGS = stmt -> {
-  };
+  private static final ProsearchJdbcDataStore.PreparedStatementConsumer NO_ARGS = stmt -> {};
 
   private final ProsearchJdbcDataStoreEngine engine;
   private String tableName;
@@ -36,15 +35,12 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   private final ProsearchTableAdapter adapter;
 
   ProsearchJdbcDataStore(
-    ProsearchJdbcDataStoreEngine engine,
-    String storeName,
-    Class<? extends T> type) {
+      ProsearchJdbcDataStoreEngine engine, String storeName, Class<? extends T> type) {
     super();
     this.engine = requireNonNull(engine, "'engine' must not be null.");
     this.type = requireNonNull(type, "'type' must not be null.");
     this.adapter = engine.getTableAdapter();
-    this.storeName = requireNonNull(
-      storeName, "'storeName' must not be null.");
+    this.storeName = requireNonNull(storeName, "'storeName' must not be null.");
     this.tableName = engine.tableName(storeName);
     if (!engine.tableExist(tableName)) {
       createTable();
@@ -63,81 +59,83 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   @Override
   public void save(String id, T object) {
     executeWrite(
-      "MERGE INTO <table> AS t "
-        + "USING ("
-        + "  SELECT "
-        + "    CAST(? AS " + adapter.idType() + ") AS id,"
-        + "    CAST(? AS " + adapter.modifiedType() + ") AS modified,"
-        + "    CAST(? AS " + adapter.jsonType() + ") AS json "
-        // https://wiki.postgresql.org/wiki/Oracle_to_Postgres_Conversion#The_Dual_Table
-        // + "  FROM DUAL"
-        + ") AS s "
-        + "  ON t.id = s.id "
-        + "WHEN NOT MATCHED THEN "
-        + "  INSERT (id, modified, json) "
-        + "  VALUES (s.id, s.modified, s.json) "
-        + "WHEN MATCHED THEN "
-        + "  UPDATE SET "
-        + "    modified = s.modified, "
-        + "    json = s.json ",
-      stmt -> {
-        stmt.setString(1, adapter.serializableId(id));
-        stmt.setTimestamp(2, new Timestamp(currentTimeMillis()));
-        stmt.setString(3, GSON.toJson(object));
-      });
+        "MERGE INTO <table> AS t "
+            + "USING ("
+            + "  SELECT "
+            + "    CAST(? AS "
+            + adapter.idType()
+            + ") AS id,"
+            + "    CAST(? AS "
+            + adapter.modifiedType()
+            + ") AS modified,"
+            + "    CAST(? AS "
+            + adapter.jsonType()
+            + ") AS json "
+            // https://wiki.postgresql.org/wiki/Oracle_to_Postgres_Conversion#The_Dual_Table
+            // + "  FROM DUAL"
+            + ") AS s "
+            + "  ON t.id = s.id "
+            + "WHEN NOT MATCHED THEN "
+            + "  INSERT (id, modified, json) "
+            + "  VALUES (s.id, s.modified, s.json) "
+            + "WHEN MATCHED THEN "
+            + "  UPDATE SET "
+            + "    modified = s.modified, "
+            + "    json = s.json ",
+        stmt -> {
+          stmt.setString(1, adapter.serializableId(id));
+          stmt.setTimestamp(2, new Timestamp(currentTimeMillis()));
+          stmt.setString(3, GSON.toJson(object));
+        });
   }
 
   @Override
   public Optional<T> find(String id) {
     return executeRead(
-      "SELECT id, json FROM <table> WHERE id = ?",
-      stmt -> stmt.setString(1, adapter.serializableId(id)),
-      this::firstObject);
+        "SELECT id, json FROM <table> WHERE id = ?",
+        stmt -> stmt.setString(1, adapter.serializableId(id)),
+        this::firstObject);
   }
-
 
   @Override
   public Optional<T> findFirst() {
     return executeRead(
-      "SELECT id, json FROM <table> ORDER BY modified",
-      NO_ARGS,
-      this::firstObject);
+        "SELECT id, json FROM <table> ORDER BY modified", NO_ARGS, this::firstObject);
   }
 
   @Override
   public boolean exists(String id) {
     return executeRead(
-      "SELECT 1 FROM <table> WHERE id = ?",
-      stmt -> stmt.setString(1, adapter.serializableId(id)),
-      ResultSet::next);
+        "SELECT 1 FROM <table> WHERE id = ?",
+        stmt -> stmt.setString(1, adapter.serializableId(id)),
+        ResultSet::next);
   }
 
   @Override
   public long count() {
     return executeRead(
-      "SELECT count(*) FROM <table>",
-      NO_ARGS,
-      rs -> {
-        if (rs.next()) {
-          return rs.getLong(1);
-        }
-        return 0L;
-      });
+        "SELECT count(*) FROM <table>",
+        NO_ARGS,
+        rs -> {
+          if (rs.next()) {
+            return rs.getLong(1);
+          }
+          return 0L;
+        });
   }
 
   @Override
   public boolean delete(String id) {
     return executeWrite(
-      "DELETE FROM <table> WHERE id = ?",
-      stmt -> stmt.setString(1, adapter.serializableId(id))) > 0;
+            "DELETE FROM <table> WHERE id = ?",
+            stmt -> stmt.setString(1, adapter.serializableId(id)))
+        > 0;
   }
 
   @Override
   public Optional<T> deleteFirst() {
-    ProsearchJdbcDataStore.Record<T> rec = executeRead(
-      "SELECT id, json FROM <table> ORDER BY modified",
-      NO_ARGS,
-      this::firstRecord);
+    ProsearchJdbcDataStore.Record<T> rec =
+        executeRead("SELECT id, json FROM <table> ORDER BY modified", NO_ARGS, this::firstRecord);
     if (!rec.isEmpty()) {
       delete(rec.id);
     }
@@ -151,52 +149,57 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
 
   @Override
   public void close() {
-    //NOOP: Closed implicitly when datasource is closed.
+    // NOOP: Closed implicitly when datasource is closed.
   }
 
   // returns true if was all read
   @Override
   public boolean forEach(BiPredicate<String, T> predicate) {
     return executeRead(
-      "SELECT id, json FROM <table>",
-      NO_ARGS,
-      rs -> {
-        while (rs.next()) {
-          ProsearchJdbcDataStore.Record<T> rec = toRecord(rs);
-          if (!predicate.test(rec.id, rec.object.get())) {
-            return false;
+        "SELECT id, json FROM <table>",
+        NO_ARGS,
+        rs -> {
+          while (rs.next()) {
+            ProsearchJdbcDataStore.Record<T> rec = toRecord(rs);
+            if (!predicate.test(rec.id, rec.object.get())) {
+              return false;
+            }
           }
-        }
-        return true;
-      });
+          return true;
+        });
   }
 
   @Override
   public boolean isEmpty() {
-    return executeRead(
-      "SELECT * FROM <table>", NO_ARGS, (rs) -> !rs.next());
+    return executeRead("SELECT * FROM <table>", NO_ARGS, (rs) -> !rs.next());
   }
 
   private void createTable() {
     try (Connection conn = engine.getConnection()) {
       try (Statement stmt = conn.createStatement()) {
         stmt.executeUpdate(
-          "CREATE TABLE " + tableName + " ("
-            + "id " + adapter.idType() + " NOT NULL, "
-            + "modified " + adapter.modifiedType() + ", "
-            + "json " + adapter.jsonType() + ", "
-            + "PRIMARY KEY (id) "
-            + ")");
+            "CREATE TABLE "
+                + tableName
+                + " ("
+                + "id "
+                + adapter.idType()
+                + " NOT NULL, "
+                + "modified "
+                + adapter.modifiedType()
+                + ", "
+                + "json "
+                + adapter.jsonType()
+                + ", "
+                + "PRIMARY KEY (id) "
+                + ")");
         stmt.executeUpdate(
-          "CREATE INDEX " + tableName + "_modified_index "
-            + "ON " + tableName + "(modified)");
+            "CREATE INDEX " + tableName + "_modified_index " + "ON " + tableName + "(modified)");
         if (!conn.getAutoCommit()) {
           conn.commit();
         }
       }
     } catch (SQLException e) {
-      throw new DataStoreException(
-        "Could not create table '" + tableName + "'.", e);
+      throw new DataStoreException("Could not create table '" + tableName + "'.", e);
     }
   }
 
@@ -219,26 +222,22 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
       }
       return Optional.empty();
     } catch (IOException | SQLException e) {
-      throw new DataStoreException(
-        "Could not get object from table '" + tableName + "'.", e);
+      throw new DataStoreException("Could not get object from table '" + tableName + "'.", e);
     }
   }
 
-  private ProsearchJdbcDataStore.Record<T> firstRecord(
-    ResultSet rs) {
+  private ProsearchJdbcDataStore.Record<T> firstRecord(ResultSet rs) {
     try {
       if (rs.first()) {
         return toRecord(rs);
       }
       return new ProsearchJdbcDataStore.Record<>();
     } catch (IOException | SQLException e) {
-      throw new DataStoreException(
-        "Could not get record from table '" + tableName + "'.", e);
+      throw new DataStoreException("Could not get record from table '" + tableName + "'.", e);
     }
   }
 
-  private ProsearchJdbcDataStore.Record<T> toRecord(ResultSet rs)
-    throws IOException, SQLException {
+  private ProsearchJdbcDataStore.Record<T> toRecord(ResultSet rs) throws IOException, SQLException {
     ProsearchJdbcDataStore.Record<T> rec = new ProsearchJdbcDataStore.Record<>();
     rec.id = rs.getString(1);
     rec.object = toObject(rs.getString(2));
@@ -256,28 +255,28 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   }
 
   private <R> R executeRead(
-    String sql,
-    ProsearchJdbcDataStore.PreparedStatementConsumer psc,
-    ProsearchJdbcDataStore.ResultSetFunction<R> rsc) {
+      String sql,
+      ProsearchJdbcDataStore.PreparedStatementConsumer psc,
+      ProsearchJdbcDataStore.ResultSetFunction<R> rsc) {
     try (Connection conn = engine.getConnection()) {
-      try (PreparedStatement stmt = conn.prepareStatement(
-        sql.replace("<table>", tableName), ResultSet.TYPE_SCROLL_INSENSITIVE, CONCUR_UPDATABLE)) {
+      try (PreparedStatement stmt =
+          conn.prepareStatement(
+              sql.replace("<table>", tableName),
+              ResultSet.TYPE_SCROLL_INSENSITIVE,
+              CONCUR_UPDATABLE)) {
         psc.accept(stmt);
         try (ResultSet rs = stmt.executeQuery()) {
           return rsc.accept(rs);
         }
       }
     } catch (SQLException | IOException e) {
-      throw new DataStoreException(
-        "Could not read from table '" + tableName + "'.", e);
+      throw new DataStoreException("Could not read from table '" + tableName + "'.", e);
     }
   }
 
-  private int executeWrite(String sql,
-    ProsearchJdbcDataStore.PreparedStatementConsumer c) {
+  private int executeWrite(String sql, ProsearchJdbcDataStore.PreparedStatementConsumer c) {
     try (Connection conn = engine.getConnection()) {
-      try (PreparedStatement stmt = conn.prepareStatement(
-        sql.replace("<table>", tableName))) {
+      try (PreparedStatement stmt = conn.prepareStatement(sql.replace("<table>", tableName))) {
         System.out.println(stmt.toString());
         c.accept(stmt);
         int val = stmt.executeUpdate();
@@ -287,8 +286,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
         return val;
       }
     } catch (SQLException e) {
-      throw new DataStoreException(
-        "Could not write to table '" + tableName + "'.", e);
+      throw new DataStoreException("Could not write to table '" + tableName + "'.", e);
     }
   }
 
@@ -314,4 +312,3 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
     }
   }
 }
-

@@ -27,72 +27,50 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <p>
  * Data store engine using a JDBC-compatible database for storing crawl data.
- * </p>
+ *
  * <h3>Database JDBC driver</h3>
- * <p>
- * To use this data store engine, you need its JDBC database driver on the classpath.
- * </p>
+ *
+ * <p>To use this data store engine, you need its JDBC database driver on the classpath.
+ *
  * <h3>Database datasource configuration</h3>
- * <p>
- * This JDBC data store engine uses
- * <a href="https://github.com/brettwooldridge/HikariCP">Hikari</a> as the JDBC
- * datasource implementation, which provides efficient connection-pooling. Refer to
- * <a href="https://github.com/brettwooldridge/HikariCP#gear-configuration-knobs-baby">
- * Hikari's documentation</a> for all configuration options.  The Hikari options are passed as-is,
- * via <code>datasource</code> properties as shown below.
- * </p>
+ *
+ * <p>This JDBC data store engine uses <a
+ * href="https://github.com/brettwooldridge/HikariCP">Hikari</a> as the JDBC datasource
+ * implementation, which provides efficient connection-pooling. Refer to <a
+ * href="https://github.com/brettwooldridge/HikariCP#gear-configuration-knobs-baby">Hikari's
+ * documentation</a> for all configuration options. The Hikari options are passed as-is, via <code>
+ * datasource</code> properties as shown below.
+ *
  * <h3>Data types</h3>
- * <p>
- * This class only use a few data types to store its data in a generic way. It will try to detect
+ *
+ * <p>This class only use a few data types to store its data in a generic way. It will try to detect
  * what data type to use for your database. If you get errors related to field data types not being
  * supported, you have the option to redefined them.
- * </p>
- * <p>
- * {@nx.xml.usage
- * <dataStoreEngine class="com.norconex.collector.core.store.impl.jdbc.JdbcDataStoreEngine">
- * <!-- Hikari datasource configuration properties: -->
- * <datasource>
- * <property name="(property name)">(property value)</property>
- * </datasource>
- * <tablePrefix>
- * (Optional prefix used for table creation. Default is the collector id plus the crawler id, each
- * followed by an underscore character.)
- * </tablePrefix>
- * <!-- Optionally overwrite default SQL data type used.  You should only use if you get data
- * type-related errors. -->
- * <dataTypes>
- * <varchar   use="(equivalent data type for your database)" />
- * <timestamp use="(equivalent data type for your database)" />
- * <text      use="(equivalent data type for your database)" />
- * </dataTypes>
- * </dataStoreEngine>
- * }
- * <p>
- * {@nx.xml.example
- * <dataStoreEngine class="JdbcDataStoreEngine">
- * <datasource>
- * <property name="jdbcUrl">jdbc:mysql://localhost:33060/sample</property>
- * <property name="username">dbuser</property>
- * <property name="password">dbpwd</property>
- * <property name="connectionTimeout">1000</property>
- * </datasource>
- * </dataStoreEngine>
- * }
- * <p>
- * The above example contains basic settings for creating a MySQL data source.
- * </p>
+ *
+ * <p>{@nx.xml.usage <dataStoreEngine
+ * class="com.norconex.collector.core.store.impl.jdbc.JdbcDataStoreEngine"> <!-- Hikari datasource
+ * configuration properties: --> <datasource> <property name="(property name)">(property
+ * value)</property> </datasource> <tablePrefix> (Optional prefix used for table creation. Default
+ * is the collector id plus the crawler id, each followed by an underscore character.)
+ * </tablePrefix> <!-- Optionally overwrite default SQL data type used. You should only use if you
+ * get data type-related errors. --> <dataTypes> <varchar use="(equivalent data type for your
+ * database)" /> <timestamp use="(equivalent data type for your database)" /> <text use="(equivalent
+ * data type for your database)" /> </dataTypes> </dataStoreEngine> }
+ *
+ * <p>{@nx.xml.example <dataStoreEngine class="JdbcDataStoreEngine"> <datasource> <property
+ * name="jdbcUrl">jdbc:mysql://localhost:33060/sample</property> <property
+ * name="username">dbuser</property> <property name="password">dbpwd</property> <property
+ * name="connectionTimeout">1000</property> </datasource> </dataStoreEngine> }
+ *
+ * <p>The above example contains basic settings for creating a MySQL data source.
  *
  * @author Pascal Essiembre (original author)
- * <p>
- * This is a copy of JdbcDataStoreEngine edited to make things work with postgres
+ *     <p>This is a copy of JdbcDataStoreEngine edited to make things work with postgres
  */
-public class ProsearchJdbcDataStoreEngine
-  implements IDataStoreEngine, IXMLConfigurable {
+public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfigurable {
 
-  private static final Logger LOG =
-    LoggerFactory.getLogger(ProsearchJdbcDataStoreEngine.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ProsearchJdbcDataStoreEngine.class);
 
   private static final String STORE_TYPES_NAME = "_storetypes";
 
@@ -154,13 +132,11 @@ public class ProsearchJdbcDataStoreEngine
     // create a clean table name prefix to avoid collisions in case
     // multiple crawlers use the same DB.
     if (this.tablePrefix == null) {
-      this.tablePrefix = crawler.getCollector().getId()
-        + "_" + crawler.getId() + "_";
+      this.tablePrefix = crawler.getCollector().getId() + "_" + crawler.getId() + "_";
     }
 
     // create data source
-    datasource = new HikariDataSource(
-      new HikariConfig(configProperties.toProperties()));
+    datasource = new HikariDataSource(new HikariConfig(configProperties.toProperties()));
 
     tableAdapter = resolveTableAdapter();
 
@@ -169,11 +145,11 @@ public class ProsearchJdbcDataStoreEngine
   }
 
   private ProsearchTableAdapter resolveTableAdapter() {
-    return ProsearchTableAdapter.detect(StringUtils.firstNonBlank(
-        datasource.getJdbcUrl(), datasource.getDriverClassName()))
-      .withIdType(varcharType)
-      .withModifiedType(timestapType)
-      .withJsonType(textType);
+    return ProsearchTableAdapter.detect(
+            StringUtils.firstNonBlank(datasource.getJdbcUrl(), datasource.getDriverClassName()))
+        .withIdType(varcharType)
+        .withModifiedType(timestapType)
+        .withJsonType(textType);
   }
 
   @Override
@@ -203,8 +179,7 @@ public class ProsearchJdbcDataStoreEngine
   }
 
   @Override
-  public <T> IDataStore<T> openStore(
-    String storeName, Class<? extends T> type) {
+  public <T> IDataStore<T> openStore(String storeName, Class<? extends T> type) {
     storeTypes.save(storeName, type.getName());
     return new ProsearchJdbcDataStore<>(this, storeName, type);
   }
@@ -223,8 +198,7 @@ public class ProsearchJdbcDataStoreEngine
         }
       }
     } catch (SQLException e) {
-      throw new DataStoreException(
-        "Could not drop table '" + tableName + "'.", e);
+      throw new DataStoreException("Could not drop table '" + tableName + "'.", e);
     }
 
     if (storeName.equals(STORE_TYPES_NAME)) {
@@ -249,8 +223,7 @@ public class ProsearchJdbcDataStoreEngine
   public Set<String> getStoreNames() {
     Set<String> names = new HashSet<>();
     try (Connection conn = datasource.getConnection()) {
-      try (ResultSet rs = conn.getMetaData().getTables(
-        null, null, "%", new String[]{"TABLE"})) {
+      try (ResultSet rs = conn.getMetaData().getTables(null, null, "%", new String[] {"TABLE"})) {
         while (rs.next()) {
           String tableName = rs.getString(3);
           if (startsWithIgnoreCase(tableName, tablePrefix)) {
@@ -278,8 +251,7 @@ public class ProsearchJdbcDataStoreEngine
       try {
         return Optional.ofNullable(ClassUtils.getClass(typeStr.get()));
       } catch (ClassNotFoundException e) {
-        throw new DataStoreException(
-          "Could not determine type of: " + storeName, e);
+        throw new DataStoreException("Could not determine type of: " + storeName, e);
       }
     }
     return Optional.empty();
@@ -294,10 +266,8 @@ public class ProsearchJdbcDataStoreEngine
       configProperties.add(name, value);
     }
     setTablePrefix(xml.getString("tablePrefix", getTablePrefix()));
-    setVarcharType(
-      xml.getString("dataTypes/varchar/@use", getVarcharType()));
-    setTimestapType(
-      xml.getString("dataTypes/timestamp/@use", getTimestapType()));
+    setVarcharType(xml.getString("dataTypes/varchar/@use", getVarcharType()));
+    setTimestapType(xml.getString("dataTypes/timestamp/@use", getTimestapType()));
     setTextType(xml.getString("dataTypes/text/@use", getTextType()));
   }
 
@@ -308,8 +278,7 @@ public class ProsearchJdbcDataStoreEngine
       List<String> values = entry.getValue();
       for (String value : values) {
         if (value != null) {
-          xmlDatasource.addElement("property", value)
-            .setAttribute("name", entry.getKey());
+          xmlDatasource.addElement("property", value).setAttribute("name", entry.getKey());
         }
       }
     }
@@ -328,8 +297,7 @@ public class ProsearchJdbcDataStoreEngine
     try {
       return datasource.getConnection();
     } catch (SQLException e) {
-      throw new DataStoreException(
-        "Could not get database connection.", e);
+      throw new DataStoreException("Could not get database connection.", e);
     }
   }
 
@@ -342,8 +310,7 @@ public class ProsearchJdbcDataStoreEngine
 
   boolean tableExist(String tableName) {
     try (Connection conn = datasource.getConnection()) {
-      try (ResultSet rs = conn.getMetaData().getTables(
-        null, null, "%", new String[]{"TABLE"})) {
+      try (ResultSet rs = conn.getMetaData().getTables(null, null, "%", new String[] {"TABLE"})) {
         while (rs.next()) {
           if (rs.getString(3).equalsIgnoreCase(tableName)) {
             return true;
@@ -352,9 +319,7 @@ public class ProsearchJdbcDataStoreEngine
       }
       return false;
     } catch (SQLException e) {
-      throw new DataStoreException(
-        "Could not check if table '" + tableName + "' exists.", e);
+      throw new DataStoreException("Could not check if table '" + tableName + "' exists.", e);
     }
   }
 }
-
