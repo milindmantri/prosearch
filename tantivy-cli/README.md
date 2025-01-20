@@ -8,24 +8,14 @@
 
 `tantivy-cli` is the the command line interface for the [tantivy](https://github.com/quickwit-inc/tantivy) search engine. It provides indexing and search capabilities, and is suitable for smaller projects.
 
-For a more complete solution around tantivy, you may use
-- https://github.com/quickwit-oss/quickwit
-- https://github.com/lnx-search/lnx
-
-# Tutorial: Indexing Wikipedia with Tantivy CLI
-
-## Introduction
-
-In this tutorial, we will create a brand new index with the articles of English wikipedia in it.
-
 ## Installing the tantivy CLI.
 
 There are a couple ways to install `tantivy-cli`.
 
-If you are a Rust programmer, you probably have `cargo` installed and you can just:
+If you are a Rust programmer, you probably have `cargo` installed and you can just from `tantivy-cli` directory:
 
 ```bash
-cargo install tantivy-cli --locked
+cargo install tantivy-cli --locked --path ./
 ```
 
 ## Creating the index:  `new`
@@ -33,7 +23,7 @@ cargo install tantivy-cli --locked
 Let's create a directory in which your index will be stored.
 
 ```bash
-mkdir wikipedia-index
+mkdir prosearch-index
 ```
 
 We will now initialize the index and create its schema.
@@ -62,7 +52,7 @@ pass it your index directory via the `-i` or `--index`
 parameter as follows:
 
 ```bash
-tantivy new -i wikipedia-index
+tantivy new -i prosearch-index
 ```
 
 Answer the questions as follows:
@@ -102,45 +92,10 @@ Answer the questions as follows:
     Should the field be indexed (Y/N) ? N
     Add another field (Y/N) ? N
 
-
-    [
-    {
-        "name": "title",
-        "type": "text",
-        "options": {
-            "indexing": "position",
-            "stored": true
-        }
-    },
-    {
-        "name": "body",
-        "type": "text",
-        "options": {
-            "indexing": "position",
-            "stored": true
-        }
-    },
-    {
-        "name": "url",
-        "type": "text",
-        "options": {
-            "indexing": "unindexed",
-            "stored": true
-        }
-    }
-    ]
-
-
 ```
 
-After the wizard has finished, a `meta.json` should exist in `wikipedia-index/meta.json`.
+After the wizard has finished, a `meta.json` should exist in `prosearch-index/meta.json`.
 It is a fairly human readable JSON, so you can check its content.
-
-It contains two sections:
-- segments (currently empty, but we will change that soon)
-- schema 
-
- 
 
 # Indexing the document: `index`
 
@@ -153,35 +108,23 @@ The structure of this JSON object must match that of our schema definition.
 {"body": "some text", "title": "some title", "url": "http://somedomain.com"}
 ```
 
-For this tutorial, you can download a corpus with the 5 million+ English Wikipedia articles in the right format here: [wiki-articles.json (2.34 GB)](https://www.dropbox.com/s/wwnfnu441w1ec9p/wiki-articles.json.bz2?dl=0).
-Make sure to decompress the file. Also, you can avoid this if you have `bzcat` installed so that you can read it compressed.
-
-```bash
-bunzip2 wiki-articles.json.bz2
-```
-
-If you are in a rush you can [download 100 articles in the right format here (11 MB)](http://fulmicoton.com/tantivy-files/wiki-articles-1000.json).
-
 The `index` command will index your document.
 By default it will use as 3 thread, each with a buffer size of 1GB split a
 across these threads. 
 
 
 ```bash
-cat wiki-articles.json | tantivy index -i ./wikipedia-index
+tantivy index -i ./prosearch-index <your-json-doc>
 ```
 
 You can change the number of threads by passing it the `-t` parameter, and the total
 buffer size used by the threads heap by using the `-m`. Note that tantivy's memory usage
 is greater than just this buffer size parameter.
 
-On my computer (8 core Xeon(R) CPU X3450  @ 2.67GHz), on 8 threads, indexing wikipedia takes around 9 minutes.
-
-
 While tantivy is indexing, you can peek at the index directory to check what is happening.
 
 ```bash
-ls ./wikipedia-index
+ls ./prosearch-index
 ```
 
 The main file is `meta.json`.
@@ -190,17 +133,17 @@ You should also see a lot of files with a UUID as filename, and different extens
 Our index is in fact divided in segments. Each segment acts as an individual smaller index.
 Its name is simply a uuid. 
 
-If you decided to index the complete wikipedia, you may also see some of these files disappear.
 Having too many segments can hurt search performance, so tantivy actually automatically starts
 merging segments. 
 
 # Serve the search index: `serve`
 
 Tantivy's cli also embeds a search server.
+**NOTE**: This version of tantivy-cli is modified to emit snippets of documents.
 You can run it with the following command.
 
 ```bash
-tantivy serve -i wikipedia-index
+tantivy serve -i prosearch-index
 ```
 
 By default, it will serve on port `3000`.
@@ -222,17 +165,6 @@ Also, `-` makes it possible to remove documents the documents containing a speci
 Finally tantivy handle phrase queries.
 
     http://localhost:3000/api/?q=%22barack%20obama%22&nhits=20
-    
-
-# Search the index via the command line
-
-You may also use the `search` command to stream all documents matching a specific query.
-The documents are returned in an unspecified order.
-
-```bash
-tantivy search -i wikipedia-index -q "barack obama"
-tantivy search -i hdfs --query "*" --agg '{"severities":{"terms":{"field":"severity_text"}}}'
-```
 
 # Benchmark the index: `bench`
 
@@ -240,5 +172,5 @@ Tantivy's cli provides a simple benchmark tool.
 You can run it with the following command.
 
 ```bash
-tantivy bench -i wikipedia-index -n 10 -q queries.txt
+tantivy bench -i prosearch-index -n 10 -q queries.txt
 ```
