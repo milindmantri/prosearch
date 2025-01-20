@@ -1,0 +1,11 @@
+/target
+.project
+.DS_Store
+.idea
+Makefile
+index
+meta.json
+*.json
+*.meta
+*.zst
+*.zip
