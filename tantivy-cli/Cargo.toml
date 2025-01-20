@@ -1,12 +1,12 @@
 [package]
 name = "tantivy-cli"
-version = "0.23.0-dev"
-authors = ["Paul Masurel <paul.masurel@gmail.com>"]
+version = "0.23.0-dev-prosearch"
+authors = ["Paul Masurel <paul.masurel@gmail.com>", "Milind Mantri <milind@milindmantri.com>"]
 
 description = """Command line interface for Tantivy, a search engine library."""
-documentation = "https://github.com/quickwit-inc/tantivy-cli"
-homepage = "https://github.com/quickwit-inc/tantivy-cli"
-repository = "https://github.com/quickwit-inc/tantivy-cli"
+documentation = "https://github.com/milindmantri/prosearch"
+homepage = "https://github.com/milindmantri/prosearch"
+repository = "https://github.com/milindmantri/prosearch"
 
 readme = "README.md"
 keywords = ["search", "information", "retrieval"]
