@@ -12,6 +12,9 @@
 ///
 ///     http://localhost:3000/api/?q=fulmicoton&nhits=20
 ///
+
+/// Ref: https://github.com/quickwit-oss/tantivy/blob/main/examples/snippet.rs
+
 use crate::timer::TimerTree;
 use clap::ArgMatches;
 use iron::mime::Mime;
@@ -38,6 +41,7 @@ use tantivy::Index;
 use tantivy::IndexReader;
 use tantivy::TantivyDocument;
 use tantivy::{DocAddress, Score};
+use tantivy::snippet::{Snippet, SnippetGenerator};
 use urlencoded::UrlEncodedQuery;
 
 pub fn run_serve_cli(matches: &ArgMatches) -> Result<(), String> {
@@ -61,6 +65,7 @@ struct Serp {
 struct Hit {
     score: Score,
     doc: NamedFieldDocument,
+    snip: String,
     id: u32,
 }
 
@@ -94,11 +99,12 @@ impl IndexServer {
         })
     }
 
-    fn create_hit<D: Document>(&self, score: Score, doc: D, doc_address: DocAddress) -> Hit {
+    fn create_hit<D: Document>(&self, score: Score, doc: D, doc_address: DocAddress, snippet: String) -> Hit {
         Hit {
             score,
             doc: doc.to_named_doc(&self.schema),
             id: doc_address.doc_id,
+            snip: snippet
         }
     }
 
@@ -116,13 +122,20 @@ impl IndexServer {
                 &(TopDocs::with_limit(num_hits).and_offset(offset), Count),
             )?
         };
+
+        let body = self.schema.get_field("body").unwrap();
+        let snippet_generator = SnippetGenerator::create(&searcher, &*query, body)?;
+
         let hits: Vec<Hit> = {
             let _fetching_timer = timer_tree.open("fetching docs");
             top_docs
                 .iter()
                 .map(|(score, doc_address)| {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
-                    self.create_hit(*score, doc, *doc_address)
+
+                    let snippet = snippet_generator.snippet_from_doc(&doc).to_html();
+
+                    self.create_hit(*score, doc, *doc_address, snippet)
                 })
                 .collect()
         };
