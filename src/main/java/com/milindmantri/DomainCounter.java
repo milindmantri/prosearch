@@ -3,6 +3,7 @@ package com.milindmantri;
 import com.norconex.collector.core.filter.IReferenceFilter;
 import java.net.URI;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -12,10 +13,14 @@ public class DomainCounter implements IReferenceFilter {
 
   private final Map<String, AtomicInteger> count = new ConcurrentHashMap<>();
 
-  public DomainCounter(final int limit) {
+  public DomainCounter(final int limit, final Properties props) {
     if (limit <= 0) {
       throw new IllegalArgumentException(
           "Limit must be greater than zero, but was %d.".formatted(limit));
+    }
+
+    if (props == null) {
+      throw new IllegalArgumentException("{props} must not be null.");
     }
 
     this.limit = limit;
