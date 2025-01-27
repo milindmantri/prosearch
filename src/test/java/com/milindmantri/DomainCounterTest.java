@@ -2,6 +2,8 @@ package com.milindmantri;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.norconex.collector.core.crawler.Crawler;
+import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
@@ -11,6 +13,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 class DomainCounterTest {
 
@@ -32,6 +35,8 @@ class DomainCounterTest {
       """
     DROP TABLE IF EXISTS host_count;
     """;
+
+  private final Crawler mockCrawler = Mockito.mock(Crawler.class);
 
   @BeforeEach
   void createTable() throws SQLException {
@@ -89,6 +94,29 @@ class DomainCounterTest {
     assertTrue(dc.acceptReference("http://host.com/3"));
 
     assertFalse(dc.acceptReference("http://host.com/4"));
+  }
+
+  @Test
+  void createTableOnCrawlerStart() throws SQLException {
+    var dc = new DomainCounter(1, dbProps());
+
+    // ensure no table exists
+    dropTable();
+
+    dc.accept(new CrawlerEvent.Builder(CrawlerEvent.CRAWLER_INIT_BEGIN, mockCrawler).build());
+
+    String count =
+        """
+    SELECT COUNT(*) FROM host_count;
+    """;
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement(count)) {
+      var rs = ps.executeQuery();
+      while (rs.next()) {
+        assertEquals(0, rs.getInt(1));
+      }
+    }
   }
 
   // TODO: increment in DB test
