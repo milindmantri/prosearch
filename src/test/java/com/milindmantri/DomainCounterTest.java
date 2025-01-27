@@ -179,7 +179,6 @@ class DomainCounterTest {
     }
   }
 
-  // TODO: add index
   // TODO: add clearing mechanism
 
   private static Properties dbProps() {

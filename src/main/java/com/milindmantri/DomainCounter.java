@@ -78,9 +78,11 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       // create table
 
       try (var con = this.dataSource.getConnection();
-          var ps = con.prepareStatement(CREATE_TABLE)) {
+          var createTablePs = con.prepareStatement(CREATE_TABLE);
+          var indexStmt = con.createStatement()) {
 
-        ps.executeUpdate();
+        createTablePs.executeUpdate();
+        indexStmt.executeUpdate("CREATE INDEX host_count_index ON host_count (host)");
 
       } catch (SQLException e) {
         throw new RuntimeException(e);
