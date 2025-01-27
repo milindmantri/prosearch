@@ -117,6 +117,14 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
         this.count.put(host, new AtomicInteger(count));
       }
+    } catch (final SQLException ex) {
+      // check if table exists
+      if (!"42P01".equals(ex.getSQLState())) {
+        // https://www.postgresql.org/docs/current/errcodes-appendix.html
+        // table exists, but fetch failed. Don't throw if table doesn't exist.
+
+        throw ex;
+      }
     }
   }
 }

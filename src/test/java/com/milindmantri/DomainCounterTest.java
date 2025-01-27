@@ -103,6 +103,12 @@ class DomainCounterTest {
   }
 
   @Test
+  void noTableWhenRestoring() throws SQLException {
+    dropTable();
+    assertDoesNotThrow(() -> new DomainCounter(3, datasource));
+  }
+
+  @Test
   void createTableOnCrawlerStart() throws SQLException {
     var dc = new DomainCounter(1, datasource);
 
