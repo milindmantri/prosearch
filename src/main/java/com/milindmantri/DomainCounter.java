@@ -62,6 +62,20 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       }
 
     } else {
+
+      try (var datasource = new HikariDataSource(new HikariConfig(dbProps));
+          var con = datasource.getConnection();
+          var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
+
+        ps.setString(1, host);
+        ps.setString(2, reference);
+
+        ps.executeUpdate();
+
+      } catch (SQLException e) {
+        throw new RuntimeException(e);
+      }
+
       count.put(host, new AtomicInteger(1));
       return true;
     }

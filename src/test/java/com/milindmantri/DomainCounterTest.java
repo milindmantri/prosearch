@@ -113,15 +113,34 @@ class DomainCounterTest {
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement(count)) {
       var rs = ps.executeQuery();
-      while (rs.next()) {
-        assertEquals(0, rs.getInt(1));
-      }
+      assertTrue(rs.next());
+      assertEquals(0, rs.getInt(1));
     }
   }
 
-  // TODO: increment in DB test
+  @Test
+  void insertEntryOnNewLink() throws SQLException {
+    var dc = new DomainCounter(1, dbProps());
+
+    final String link = "https://www.php.net/new-link";
+
+    assertTrue(dc.acceptReference(link));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+
+      var rs = ps.executeQuery();
+
+      assertTrue(rs.next());
+      String host = rs.getString(1);
+      String url = rs.getString(2);
+
+      assertEquals("www.php.net", host);
+      assertEquals(link, url);
+    }
+  }
+
   // TODO: add index
-  // TODO: add sql
   // TODO: add clearing mechanism
 
   private static Properties dbProps() {
