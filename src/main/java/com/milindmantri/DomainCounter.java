@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.sql.DataSource;
 
 public class DomainCounter implements IReferenceFilter {
 
@@ -52,8 +51,9 @@ public class DomainCounter implements IReferenceFilter {
   }
 
   void restoreCount(final Properties props) throws SQLException {
-    final DataSource datasource = new HikariDataSource(new HikariConfig(props));
-    try (var con = datasource.getConnection();
+
+    try (var datasource = new HikariDataSource(new HikariConfig(props));
+        var con = datasource.getConnection();
         var ps =
             con.prepareStatement(
                 """
