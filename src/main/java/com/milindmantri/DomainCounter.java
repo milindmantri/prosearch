@@ -61,15 +61,8 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       }
 
     } else {
-
-      try (var con = this.dataSource.getConnection();
-          var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
-
-        ps.setString(1, host);
-        ps.setString(2, reference);
-
-        ps.executeUpdate();
-
+      try {
+        insertIntoDb(host, reference);
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
@@ -96,7 +89,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
     }
   }
 
-  void restoreCount() throws SQLException {
+  private void restoreCount() throws SQLException {
 
     try (var con = this.dataSource.getConnection();
         var ps =
@@ -125,6 +118,17 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
         throw ex;
       }
+    }
+  }
+
+  private void insertIntoDb(final String host, final String reference) throws SQLException {
+    try (var con = this.dataSource.getConnection();
+        var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
+
+      ps.setString(1, host);
+      ps.setString(2, reference);
+
+      ps.executeUpdate();
     }
   }
 }
