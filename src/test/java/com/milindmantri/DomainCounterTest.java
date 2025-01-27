@@ -179,7 +179,18 @@ class DomainCounterTest {
     }
   }
 
-  // TODO: add clearing mechanism
+  @Test
+  void dropTableWhenCrawlingEnds() throws SQLException {
+    var dc = new DomainCounter(2, datasource);
+    dc.accept(new CrawlerEvent.Builder(CrawlerEvent.CRAWLER_RUN_END, mockCrawler).build());
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+
+      SQLException ex = assertThrows(SQLException.class, ps::executeQuery);
+      assertEquals("42P01", ex.getSQLState());
+    }
+  }
 
   private static Properties dbProps() {
     var props = new Properties();

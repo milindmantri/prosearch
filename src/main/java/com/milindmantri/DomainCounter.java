@@ -24,6 +24,8 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
   )
   """;
 
+  private static final String PG_UNDEFINED_RELATION_ERR_CODE = "42P01";
+
   private final int limit;
 
   private final Map<String, AtomicInteger> count = new ConcurrentHashMap<>();
@@ -87,6 +89,16 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
+    } else if (event.is(CrawlerEvent.CRAWLER_RUN_END)) {
+      try (var con = this.dataSource.getConnection();
+          // TODO: IF EXISTS?
+          var createTablePs = con.prepareStatement("DROP TABLE host_count")) {
+
+        createTablePs.executeUpdate();
+
+      } catch (SQLException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -113,7 +125,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       }
     } catch (final SQLException ex) {
       // check if table exists
-      if (!"42P01".equals(ex.getSQLState())) {
+      if (!PG_UNDEFINED_RELATION_ERR_CODE.equals(ex.getSQLState())) {
         // https://www.postgresql.org/docs/current/errcodes-appendix.html
         // table exists, but fetch failed. Don't throw if table doesn't exist.
 
