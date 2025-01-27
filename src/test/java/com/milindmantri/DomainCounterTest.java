@@ -152,6 +152,33 @@ class DomainCounterTest {
     }
   }
 
+  @Test
+  void insertEntryOnNewLink2() throws SQLException {
+    var dc = new DomainCounter(2, datasource);
+
+    final String link1 = "https://www.php.net/new-link";
+    final String link2 = "https://www.php.net/new-link2";
+
+    assertTrue(dc.acceptReference(link1));
+    assertTrue(dc.acceptReference(link2));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+
+      var rs = ps.executeQuery();
+
+      assertTrue(rs.next());
+      assertEquals("www.php.net", rs.getString(1));
+      assertEquals(link1, rs.getString(2));
+
+      assertTrue(rs.next());
+      assertEquals("www.php.net", rs.getString(1));
+      assertEquals(link2, rs.getString(2));
+
+      assertFalse(rs.next());
+    }
+  }
+
   // TODO: add index
   // TODO: add clearing mechanism
 

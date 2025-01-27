@@ -57,15 +57,12 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       if (i.get() == limit) {
         return false;
       } else {
+        insertIntoDb(host, reference);
         return i.incrementAndGet() <= limit;
       }
 
     } else {
-      try {
-        insertIntoDb(host, reference);
-      } catch (SQLException e) {
-        throw new RuntimeException(e);
-      }
+      insertIntoDb(host, reference);
 
       count.put(host, new AtomicInteger(1));
       return true;
@@ -121,7 +118,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
     }
   }
 
-  private void insertIntoDb(final String host, final String reference) throws SQLException {
+  private void insertIntoDb(final String host, final String reference) {
     try (var con = this.dataSource.getConnection();
         var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
 
@@ -129,6 +126,8 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       ps.setString(2, reference);
 
       ps.executeUpdate();
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
     }
   }
 }
