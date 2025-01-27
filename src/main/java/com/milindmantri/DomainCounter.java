@@ -51,6 +51,8 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
   public boolean acceptReference(final String reference) {
     String host = URI.create(reference).getHost();
 
+    // TODO: insertIntoDb and local count handling should happen in a txn
+
     if (count.containsKey(host)) {
       AtomicInteger i = count.get(host);
 
