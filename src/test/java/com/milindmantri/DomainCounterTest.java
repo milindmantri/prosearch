@@ -9,7 +9,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.stream.IntStream;
-import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,8 @@ class DomainCounterTest {
 
   // NOTE: Ensure PG is running on local and "test" DB exists.
 
-  private static final DataSource datasource = new HikariDataSource(new HikariConfig(dbProps()));
+  private static final HikariDataSource datasource =
+      new HikariDataSource(new HikariConfig(dbProps()));
 
   private static final String CREATE_TABLE =
       """
@@ -37,6 +38,11 @@ class DomainCounterTest {
     """;
 
   private final Crawler mockCrawler = Mockito.mock(Crawler.class);
+
+  @AfterAll
+  static void closeDataSource() {
+    datasource.close();
+  }
 
   @BeforeEach
   void createTable() throws SQLException {
@@ -56,14 +62,14 @@ class DomainCounterTest {
 
   @Test
   void invalidLimit() {
-    assertThrows(IllegalArgumentException.class, () -> new DomainCounter(-1, dbProps()));
+    assertThrows(IllegalArgumentException.class, () -> new DomainCounter(-1, datasource));
     assertThrows(IllegalArgumentException.class, () -> new DomainCounter(-1, null));
   }
 
   @Test
   void stopAfterLimitSingleHost() throws SQLException {
     // should stop after limit is reached
-    DomainCounter dc = new DomainCounter(3, dbProps());
+    DomainCounter dc = new DomainCounter(3, datasource);
 
     assertTrue(
         IntStream.range(0, 3)
@@ -89,7 +95,7 @@ class DomainCounterTest {
       ps.executeUpdate();
     }
 
-    DomainCounter dc = new DomainCounter(3, dbProps());
+    DomainCounter dc = new DomainCounter(3, datasource);
 
     assertTrue(dc.acceptReference("http://host.com/3"));
 
@@ -98,7 +104,7 @@ class DomainCounterTest {
 
   @Test
   void createTableOnCrawlerStart() throws SQLException {
-    var dc = new DomainCounter(1, dbProps());
+    var dc = new DomainCounter(1, datasource);
 
     // ensure no table exists
     dropTable();
@@ -120,7 +126,7 @@ class DomainCounterTest {
 
   @Test
   void insertEntryOnNewLink() throws SQLException {
-    var dc = new DomainCounter(1, dbProps());
+    var dc = new DomainCounter(1, datasource);
 
     final String link = "https://www.php.net/new-link";
 

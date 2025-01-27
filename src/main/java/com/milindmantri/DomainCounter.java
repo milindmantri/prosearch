@@ -4,15 +4,13 @@ import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.filter.IReferenceFilter;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.sql.DataSource;
 
 public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
@@ -30,22 +28,23 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
   private final Map<String, AtomicInteger> count = new ConcurrentHashMap<>();
 
-  private final Properties dbProps;
+  private final DataSource dataSource;
 
-  public DomainCounter(final int limit, final Properties props) throws SQLException {
+  /** Caller is responsible for closing dataSource */
+  public DomainCounter(final int limit, final DataSource dataSource) throws SQLException {
     if (limit <= 0) {
       throw new IllegalArgumentException(
           "Limit must be greater than zero, but was %d.".formatted(limit));
     }
 
-    if (props == null) {
-      throw new IllegalArgumentException("{props} must not be null.");
+    if (dataSource == null) {
+      throw new IllegalArgumentException("{dataSource} must not be null.");
     }
 
     this.limit = limit;
-    this.dbProps = props;
+    this.dataSource = dataSource;
 
-    restoreCount(props);
+    restoreCount();
   }
 
   @Override
@@ -63,8 +62,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
     } else {
 
-      try (var datasource = new HikariDataSource(new HikariConfig(dbProps));
-          var con = datasource.getConnection();
+      try (var con = this.dataSource.getConnection();
           var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
 
         ps.setString(1, host);
@@ -87,8 +85,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
     if (event.is(CrawlerEvent.CRAWLER_INIT_BEGIN)) {
       // create table
 
-      try (var datasource = new HikariDataSource(new HikariConfig(dbProps));
-          var con = datasource.getConnection();
+      try (var con = this.dataSource.getConnection();
           var ps = con.prepareStatement(CREATE_TABLE)) {
 
         ps.executeUpdate();
@@ -99,10 +96,9 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
     }
   }
 
-  void restoreCount(final Properties props) throws SQLException {
+  void restoreCount() throws SQLException {
 
-    try (var datasource = new HikariDataSource(new HikariConfig(props));
-        var con = datasource.getConnection();
+    try (var con = this.dataSource.getConnection();
         var ps =
             con.prepareStatement(
                 """
