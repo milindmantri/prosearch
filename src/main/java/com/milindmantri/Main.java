@@ -7,17 +7,22 @@ import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.commons.lang.text.TextMatcher;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
 
 public class Main {
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws SQLException {
 
     // Why even allow for new HttpCollector(), when setting id is required. It will anyway error.
     HttpCollectorConfig config = new HttpCollectorConfig();
     config.setId("test");
+
+    // TODO: crawler automatically closes after finish. We want to recrawl routinely.
 
     config.setMaxConcurrentCrawlers(2);
 
@@ -25,6 +30,9 @@ public class Main {
 
     // TODO: pass list of all URLs to crawl
     crawlerConfig.setStartURLs("https://www.php.net", "https://elm-lang.org");
+
+    // TODO: Set threads for crawler
+
     crawlerConfig.setId("test-crawler");
 
     // TODO: What about the case for redirected domains, like openjdk.java.net
@@ -36,10 +44,15 @@ public class Main {
     crawlerConfig.setFetchHttpHead(true);
     crawlerConfig.setMetadataFilters(getTextOnlyMetadataFilters().toList());
 
-    try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine()) {
+    try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine();
+        var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()))) {
 
       engine.setConfigProperties(dbProps());
       crawlerConfig.setDataStoreEngine(engine);
+
+      var domainCounter = new DomainCounter(10_000, dataSource);
+      crawlerConfig.setEventListeners(domainCounter);
+      crawlerConfig.setReferenceFilters(domainCounter);
 
       config.setCrawlerConfigs(crawlerConfig);
 
