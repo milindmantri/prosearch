@@ -1,11 +1,16 @@
 package com.milindmantri;
 
 import com.norconex.collector.core.filter.IReferenceFilter;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.sql.DataSource;
 
 public class DomainCounter implements IReferenceFilter {
 
@@ -13,7 +18,7 @@ public class DomainCounter implements IReferenceFilter {
 
   private final Map<String, AtomicInteger> count = new ConcurrentHashMap<>();
 
-  public DomainCounter(final int limit, final Properties props) {
+  public DomainCounter(final int limit, final Properties props) throws SQLException {
     if (limit <= 0) {
       throw new IllegalArgumentException(
           "Limit must be greater than zero, but was %d.".formatted(limit));
@@ -24,6 +29,7 @@ public class DomainCounter implements IReferenceFilter {
     }
 
     this.limit = limit;
+    restoreCount(props);
   }
 
   @Override
@@ -42,6 +48,30 @@ public class DomainCounter implements IReferenceFilter {
     } else {
       count.put(host, new AtomicInteger(1));
       return true;
+    }
+  }
+
+  void restoreCount(final Properties props) throws SQLException {
+    final DataSource datasource = new HikariDataSource(new HikariConfig(props));
+    try (var con = datasource.getConnection();
+        var ps =
+            con.prepareStatement(
+                """
+            SELECT
+              count(*), host
+            FROM
+              host_count
+            GROUP BY host
+          """)) {
+
+      ResultSet rs = ps.executeQuery();
+
+      while (rs.next()) {
+        int count = rs.getInt(1);
+        String host = rs.getString(2);
+
+        this.count.put(host, new AtomicInteger(count));
+      }
     }
   }
 }

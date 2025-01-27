@@ -23,7 +23,7 @@ class DomainCounterTest {
     CREATE TABLE IF NOT EXISTS
       host_count
     (
-        host VARCHAR PRIMARY KEY
+        host VARCHAR
       , url VARCHAR
     )
     """;
@@ -56,7 +56,7 @@ class DomainCounterTest {
   }
 
   @Test
-  void stopAfterLimitSingleHost() {
+  void stopAfterLimitSingleHost() throws SQLException {
     // should stop after limit is reached
     DomainCounter dc = new DomainCounter(3, dbProps());
 
@@ -67,6 +67,34 @@ class DomainCounterTest {
 
     assertFalse(dc.acceptReference("http://host.com/4"));
   }
+
+  @Test
+  void restoreCountWhenStarting() throws SQLException {
+
+    try (var con = datasource.getConnection();
+        var ps =
+            con.prepareStatement(
+                """
+            INSERT INTO
+              host_count
+            VALUES
+                ('host.com', 'http://host.com/1')
+              , ('host.com', 'http://host.com/2')
+            """)) {
+      ps.executeUpdate();
+    }
+
+    DomainCounter dc = new DomainCounter(3, dbProps());
+
+    assertTrue(dc.acceptReference("http://host.com/3"));
+
+    assertFalse(dc.acceptReference("http://host.com/4"));
+  }
+
+  // TODO: increment in DB test
+  // TODO: add index
+  // TODO: add sql
+  // TODO: add clearing mechanism
 
   private static Properties dbProps() {
     var props = new Properties();
