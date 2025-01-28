@@ -2,35 +2,27 @@ package com.milindmantri;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.google.gson.stream.JsonReader;
-import java.io.IOException;
-import java.io.StringReader;
+import com.google.gson.JsonObject;
 import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 
 class ZoneIdAdapterTest {
 
-  @org.junit.jupiter.api.Test
-  void read() throws IOException {
+  @Test
+  void read() {
 
-    String json =
-        """
-    { "id" : "Asia/Kolkata" }
-    """;
+    var obj = new JsonObject();
+    obj.addProperty("id", "Asia/Kolkata");
 
     assertEquals(
-        ZoneId.of("Asia/Kolkata"),
-        new ZoneIdAdapter().read(new JsonReader(new StringReader(json))));
+        ZoneId.of("Asia/Kolkata"), new ZoneIdAdapter().deserialize(obj, ZoneId.class, null));
   }
 
   @Test
-  void readNull() throws IOException {
+  void readNull() {
+    var obj = new JsonObject();
+    obj.add("id", null);
 
-    String json =
-        """
-    { "id" : null }
-    """;
-
-    assertEquals(null, new ZoneIdAdapter().read(new JsonReader(new StringReader(json))));
+    assertNull(new ZoneIdAdapter().deserialize(obj, ZoneId.class, null));
   }
 }

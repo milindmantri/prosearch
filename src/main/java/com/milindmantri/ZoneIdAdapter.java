@@ -1,49 +1,38 @@
 package com.milindmantri;
 
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
-import java.io.IOException;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
+import java.lang.reflect.Type;
 import java.time.ZoneId;
 
 // Required for ZoneId which was failing when as it didn't allow empty constructor for init
-public class ZoneIdAdapter extends TypeAdapter<ZoneId> {
+public class ZoneIdAdapter implements JsonSerializer<ZoneId>, JsonDeserializer<ZoneId> {
 
   @Override
-  public void write(final JsonWriter out, final ZoneId value) throws IOException {
-    out.beginObject();
-    out.name("id");
+  public ZoneId deserialize(
+      final JsonElement json, final Type typeOfT, final JsonDeserializationContext context)
+      throws JsonParseException {
 
-    if (value == null) {
-      out.nullValue();
+    var val = json.getAsJsonObject().get("id");
+
+    if (val.isJsonNull()) {
+      return null;
     } else {
-      out.value(value.getId());
+      return ZoneId.of(val.getAsString());
     }
-
-    out.endObject();
   }
 
   @Override
-  public ZoneId read(final JsonReader in) throws IOException {
+  public JsonElement serialize(
+      final ZoneId src, final Type typeOfSrc, final JsonSerializationContext context) {
 
-    ZoneId ret = null;
-
-    in.beginObject();
-    if (in.hasNext()) {
-      var _ = in.nextName(); // id
-      if (in.peek() == JsonToken.STRING) {
-        var str = in.nextString();
-        ret =  ZoneId.of(str);
-      } else {
-        in.nextNull();
-        ret = null;
-      }
-
-      in.endObject();
-      return ret;
-    }
-
-    return null;
+    var obj = new JsonObject();
+    obj.addProperty("id", src.getId());
+    return obj;
   }
 }
