@@ -16,15 +16,14 @@ import java.util.stream.Stream;
 
 public class Main {
 
-  public static void main(String[] args) throws SQLException {
+  private static final int PER_HOST_CRAWLING_LIMIT = 10_000;
 
+  public static void main(String[] args) throws SQLException {
     // Why even allow for new HttpCollector(), when setting id is required. It will anyway error.
     HttpCollectorConfig config = new HttpCollectorConfig();
     config.setId("test");
 
     // TODO: crawler automatically closes after finish. We want to recrawl routinely.
-
-    config.setMaxConcurrentCrawlers(2);
 
     HttpCrawlerConfig crawlerConfig = new HttpCrawlerConfig();
 
@@ -50,7 +49,7 @@ public class Main {
       engine.setConfigProperties(dbProps());
       crawlerConfig.setDataStoreEngine(engine);
 
-      var domainCounter = new DomainCounter(10_000, dataSource);
+      var domainCounter = new DomainCounter(PER_HOST_CRAWLING_LIMIT, dataSource);
       crawlerConfig.setEventListeners(domainCounter);
       crawlerConfig.setReferenceFilters(domainCounter);
 
