@@ -16,6 +16,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 
@@ -27,8 +28,13 @@ import java.util.function.BiPredicate;
  */
 public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
 
+  // Used to parse HttpDocInfo
   private static final Gson GSON =
-      new GsonBuilder().registerTypeAdapter(ZoneId.class, new ZoneIdAdapter()).create();
+      new GsonBuilder()
+          .registerTypeAdapter(ZoneId.class, new ZoneIdAdapter())
+          .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeTypeAdapter())
+          .create();
+
   private static final ProsearchJdbcDataStore.PreparedStatementConsumer NO_ARGS = stmt -> {};
 
   private final ProsearchJdbcDataStoreEngine engine;
