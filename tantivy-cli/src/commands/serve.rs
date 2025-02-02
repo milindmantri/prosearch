@@ -36,12 +36,13 @@ use tantivy::schema::Field;
 use tantivy::schema::FieldType;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::schema::Schema;
+use tantivy::schema::Term;
 use tantivy::Document;
 use tantivy::Index;
-use tantivy::IndexReader;
+use tantivy::{IndexReader, IndexWriter};
 use tantivy::TantivyDocument;
 use tantivy::{DocAddress, Score};
-use tantivy::snippet::{Snippet, SnippetGenerator};
+use tantivy::snippet::{SnippetGenerator};
 use urlencoded::UrlEncodedQuery;
 
 pub fn run_serve_cli(matches: &ArgMatches) -> Result<(), String> {
@@ -70,6 +71,7 @@ struct Hit {
 }
 
 struct IndexServer {
+    index: Index,
     reader: IndexReader,
     query_parser: QueryParser,
     schema: Schema,
@@ -92,7 +94,10 @@ impl IndexServer {
         let query_parser =
             QueryParser::new(schema.clone(), default_fields, index.tokenizers().clone());
         let reader = index.reader()?;
+        // TODO: integrate writer in IndexServer
+        // Can't figure out how to get it working with Iron server
         Ok(IndexServer {
+            index,
             reader,
             query_parser,
             schema,
@@ -145,6 +150,22 @@ impl IndexServer {
             hits,
             timings: timer_tree,
         })
+    }
+
+    // https://github.com/quickwit-oss/tantivy/blob/main/examples/deleting_updating_documents.rs
+    fn delete(&self, q: String) -> tantivy::Result<String> {
+
+        let url = self.schema.get_field("url").unwrap();
+        let term = Term::from_field_text(url, &q);
+
+        let mut writer : IndexWriter = self.index.writer(15_000_000).unwrap();
+        // delete_term returns nothing but opstamp which is a number
+        let _ = writer.delete_term(term.clone());
+
+        let _ = writer.commit();
+
+        Ok("true".to_string())
+
     }
 }
 
@@ -203,11 +224,41 @@ fn search(req: &mut Request<'_, '_>) -> IronResult<Response> {
         })
 }
 
+fn delete(req: &mut Request<'_, '_>) -> IronResult<Response> {
+    let index_server = req.get::<Read<IndexServer>>().unwrap();
+    req.get_ref::<UrlEncodedQuery>()
+        .map_err(|_| {
+            IronError::new(
+                StringError(String::from("Failed to decode error")),
+                status::BadRequest,
+            )
+        })
+        .and_then(|qs_map| {
+            let url = qs_map.get("url").ok_or_else(|| {
+                IronError::new(
+                    StringError(String::from("Parameter url is missing")),
+                    status::BadRequest,
+                )
+            })?[0]
+                .clone();
+
+            index_server.delete(url).unwrap();
+
+            let content_type = "application/json".parse::<Mime>().unwrap();
+            Ok(Response::with((
+                content_type,
+                status::Ok,
+                "true".to_string(),
+            )))
+        })
+}
+
 fn run_serve(directory: PathBuf, host: &str) -> tantivy::Result<()> {
     let mut mount = Mount::new();
     let server = IndexServer::load(&directory)?;
 
     mount.mount("/api", search);
+    mount.mount("/delete", delete);
 
     let mut middleware = Chain::new(mount);
     middleware.link(Read::<IndexServer>::both(server));
