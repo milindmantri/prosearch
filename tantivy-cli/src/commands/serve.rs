@@ -22,7 +22,7 @@ use iron::prelude::*;
 use iron::status;
 use iron::typemap::Key;
 use mount::Mount;
-use persistent::Read;
+use persistent::Write;
 use serde_derive::Serialize;
 use std::convert::From;
 use std::error::Error;
@@ -71,10 +71,10 @@ struct Hit {
 }
 
 struct IndexServer {
-    index: Index,
     reader: IndexReader,
     query_parser: QueryParser,
     schema: Schema,
+    writer: IndexWriter
 }
 
 impl IndexServer {
@@ -94,13 +94,12 @@ impl IndexServer {
         let query_parser =
             QueryParser::new(schema.clone(), default_fields, index.tokenizers().clone());
         let reader = index.reader()?;
-        // TODO: integrate writer in IndexServer
-        // Can't figure out how to get it working with Iron server
+        let writer : IndexWriter = index.writer(50_000_000)?;
         Ok(IndexServer {
-            index,
             reader,
             query_parser,
             schema,
+            writer
         })
     }
 
@@ -153,15 +152,14 @@ impl IndexServer {
     }
 
     // https://github.com/quickwit-oss/tantivy/blob/main/examples/deleting_updating_documents.rs
-    fn delete(&self, q: String) -> tantivy::Result<String> {
+    fn delete(&mut self, q: String) -> tantivy::Result<String> {
 
         let url = self.schema.get_field("url").unwrap();
         let term = Term::from_field_text(url, &q);
 
-        let mut writer : IndexWriter = self.index.writer(15_000_000).unwrap();
+        let writer = &mut self.writer;
         // delete_term returns nothing but opstamp which is a number
         let _ = writer.delete_term(term.clone());
-
         let _ = writer.commit();
 
         Ok("true".to_string())
@@ -189,7 +187,9 @@ impl Error for StringError {
 }
 
 fn search(req: &mut Request<'_, '_>) -> IronResult<Response> {
-    let index_server = req.get::<Read<IndexServer>>().unwrap();
+    let binding = req.get::<Write<IndexServer>>().unwrap().clone();
+    let index_server = binding.lock().unwrap();
+
     req.get_ref::<UrlEncodedQuery>()
         .map_err(|_| {
             IronError::new(
@@ -225,7 +225,9 @@ fn search(req: &mut Request<'_, '_>) -> IronResult<Response> {
 }
 
 fn delete(req: &mut Request<'_, '_>) -> IronResult<Response> {
-    let index_server = req.get::<Read<IndexServer>>().unwrap();
+    let binding = req.get::<Write<IndexServer>>().unwrap().clone();
+    let mut index_server = binding.lock().unwrap();
+
     req.get_ref::<UrlEncodedQuery>()
         .map_err(|_| {
             IronError::new(
@@ -261,7 +263,7 @@ fn run_serve(directory: PathBuf, host: &str) -> tantivy::Result<()> {
     mount.mount("/delete", delete);
 
     let mut middleware = Chain::new(mount);
-    middleware.link(Read::<IndexServer>::both(server));
+    middleware.link(Write::<IndexServer>::both(server));
 
     println!("listening on http://{}", host);
     Iron::new(middleware).http(host).unwrap();
