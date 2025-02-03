@@ -261,6 +261,7 @@ fn run_serve(directory: PathBuf, host: &str) -> tantivy::Result<()> {
 
     mount.mount("/api", search);
     mount.mount("/delete", delete);
+    // TODO: Add /index API
 
     let mut middleware = Chain::new(mount);
     middleware.link(Write::<IndexServer>::both(server));
