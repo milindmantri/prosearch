@@ -171,35 +171,40 @@ impl IndexServer {
         Ok("true".to_string())
     }
 
-    fn index_json(&mut self, json: serde_json::Value) -> tantivy::Result<String> {
-
-        // validate json since tantivy will also accept empty docs and we want to ensure all fields
-        // are present
+    fn validate_json_for_index(&self, json: serde_json::Value) -> Option<tantivy::TantivyError> {
         if json.is_object() {
             let obj : &Map<String, Value> = json.as_object().unwrap();
 
             for key in ["url", "title", "body"].iter() {
                 match obj.get_key_value::<String>(&key.to_string()) {
-                    None => {
-                        return Err(InvalidArgument(format!("json body must contain \"{}\" field.", key)));
-                    },
-                    Some(val) => {
-                        if !val.1.is_string() {
-                            return Err(
-                                InvalidArgument(
-                                    format!("\"{}\" field must have a string value.", key)
-                                )
-                            );
-                        }
-                    }
+                    None => return Some(
+                        InvalidArgument(format!("json body must contain \"{}\" field.", key))
+                    ),
+                    Some(val) if !val.1.is_string() => return Some(
+                        InvalidArgument(
+                            format!("\"{}\" field must have a string value.", key)
+                        )
+                    ),
+                    Some(_) => {},
                 }
             }
         } else {
-            return Err(
+            return Some(
                 InvalidArgument("json body must be an object.".to_string())
             )
         }
-        
+
+        return None;
+    }
+
+    fn index_json(&mut self, json: serde_json::Value) -> tantivy::Result<String> {
+
+        // validate json since tantivy will also accept empty docs and we want to ensure all fields
+        // are present
+        if let Some(err) = self.validate_json_for_index(json.clone()) {
+            return Err(err);
+        }
+
         let json_str : &str = &serde_json::to_string(&json).unwrap();
         match TantivyDocument::parse_json(&self.schema, json_str) {
             Ok(doc) => {
