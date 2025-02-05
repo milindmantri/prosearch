@@ -41,9 +41,13 @@ use tantivy::Document;
 use tantivy::Index;
 use tantivy::{IndexReader, IndexWriter};
 use tantivy::TantivyDocument;
+use tantivy::TantivyError::InvalidArgument;
 use tantivy::{DocAddress, Score};
 use tantivy::snippet::{SnippetGenerator};
 use urlencoded::UrlEncodedQuery;
+use bodyparser::Json;
+use serde_json::Map;
+use serde_json::Value;
 
 pub fn run_serve_cli(matches: &ArgMatches) -> Result<(), String> {
     let index_directory = PathBuf::from(matches.get_one::<String>("index").unwrap());
@@ -162,8 +166,65 @@ impl IndexServer {
         let _ = writer.delete_term(term.clone());
         let _ = writer.commit();
 
-        Ok("true".to_string())
+        let _ = self.reader.reload();
 
+        Ok("true".to_string())
+    }
+
+    fn index_json(&mut self, json: serde_json::Value) -> tantivy::Result<String> {
+
+        // validate json since tantivy will also accept empty docs and we want to ensure all fields
+        // are present
+        if json.is_object() {
+            let obj : &Map<String, Value> = json.as_object().unwrap();
+
+            for key in ["url", "title", "body"].iter() {
+                match obj.get_key_value::<String>(&key.to_string()) {
+                    None => {
+                        return Err(InvalidArgument(format!("json body must contain \"{}\" field.", key)));
+                    },
+                    Some(val) => {
+                        if !val.1.is_string() {
+                            return Err(
+                                InvalidArgument(
+                                    format!("\"{}\" field must have a string value.", key)
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        } else {
+            return Err(
+                InvalidArgument("json body must be an object.".to_string())
+            )
+        }
+        
+        let json_str : &str = &serde_json::to_string(&json).unwrap();
+        match TantivyDocument::parse_json(&self.schema, json_str) {
+            Ok(doc) => {
+                let writer = &mut self.writer;
+                let _ = writer.add_document(doc);
+                let _ = writer.commit();
+                let _ = self.reader.reload();
+                Ok("true".to_string())
+            }
+            Err(err) => Err(err.into())
+        }
+    }
+
+    // for debugging
+    #[allow(dead_code)]
+    fn print_all_docs(&self) {
+        let searcher = self.reader.searcher();
+        for segment_reader in searcher.segment_readers() {
+
+            let store = segment_reader.get_store_reader(50_000_000).unwrap();
+
+            for doc in store.iter::<tantivy::TantivyDocument>(segment_reader.alive_bitset()) {
+                println!("{}", doc.unwrap().to_json(&self.schema));
+            }
+        }
     }
 }
 
@@ -255,13 +316,56 @@ fn delete(req: &mut Request<'_, '_>) -> IronResult<Response> {
         })
 }
 
+fn index_handler(req: &mut Request<'_, '_>) -> IronResult<Response> {
+    let json_body = req.get::<Json>();
+    let content_type = "application/json".parse::<Mime>().unwrap();
+
+    match json_body {
+
+        Ok(Some(json_body)) => {
+
+            let binding = req.get::<Write<IndexServer>>().unwrap().clone();
+            let mut index_server = binding.lock().unwrap();
+
+            match index_server.index_json(json_body) {
+                Ok(msg) => Ok(Response::with((
+                    content_type,
+                    status::Ok,
+                    msg,
+                ))),
+                Err(err) => Ok(Response::with((
+                    content_type,
+                    status::BadRequest,
+                    err.to_string(),
+                )))
+            }
+        }
+
+        Ok(None) => {
+            Ok(Response::with((
+                content_type,
+                status::BadRequest,
+                "No data received. Expecting json body in request payload.".to_string(),
+            )))
+        }
+
+        Err(_) => {
+            Ok(Response::with((
+                content_type,
+                status::BadRequest,
+                "Parsing failed.".to_string(),
+            )))
+        }
+    }
+}
+
 fn run_serve(directory: PathBuf, host: &str) -> tantivy::Result<()> {
     let mut mount = Mount::new();
     let server = IndexServer::load(&directory)?;
 
     mount.mount("/api", search);
     mount.mount("/delete", delete);
-    // TODO: Add /index API
+    mount.mount("/index", index_handler);
 
     let mut middleware = Chain::new(mount);
     middleware.link(Write::<IndexServer>::both(server));
@@ -270,3 +374,5 @@ fn run_serve(directory: PathBuf, host: &str) -> tantivy::Result<()> {
     Iron::new(middleware).http(host).unwrap();
     Ok(())
 }
+
+// TODO: Add tests

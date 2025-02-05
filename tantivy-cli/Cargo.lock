@@ -1258,6 +1258,7 @@ name = "tantivy-cli"
 version = "0.23.0-dev-prosearch"
 dependencies = [
  "ansi_term",
+ "bodyparser",
  "clap",
  "crossbeam-channel",
  "env_logger",
