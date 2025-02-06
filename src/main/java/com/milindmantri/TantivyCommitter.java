@@ -15,7 +15,9 @@ public class TantivyCommitter extends AbstractCommitter {
   private final TantivyClient client;
 
   public TantivyCommitter(final TantivyClient client) {
-    // Add null check
+    if (client == null) {
+      throw new IllegalArgumentException("client must not be null.");
+    }
     this.client = client;
   }
 
@@ -24,6 +26,9 @@ public class TantivyCommitter extends AbstractCommitter {
 
   @Override
   protected void doUpsert(final UpsertRequest upsertRequest) throws CommitterException {
+    if (upsertRequest == null) {
+      throw new IllegalArgumentException("upsertRequest must not be null.");
+    }
 
     client.delete(URI.create(upsertRequest.getReference()));
     client.index(

@@ -39,4 +39,16 @@ class TantivyCommitterTest {
           .index(URI.create("http://example.com"), "Example Title", "content");
     }
   }
+
+  @Test
+  void nullClient() {
+    assertThrows(IllegalArgumentException.class, () -> new TantivyCommitter(null));
+  }
+
+  @Test
+  void nullUpsert() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new TantivyCommitter(Mockito.mock(TantivyClient.class)).doUpsert(null));
+  }
 }
