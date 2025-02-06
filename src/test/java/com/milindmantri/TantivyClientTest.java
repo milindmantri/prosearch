@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -44,10 +45,25 @@ class TantivyClientTest {
     when(response.statusCode()).thenReturn(200);
     when(response.body()).thenReturn("true");
 
-    // httpclient should receive correct URI, json body, json header and GET
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(response);
 
     assertTrue(tc.delete(URI.create("http://delete-this-link.com")));
+  }
+
+  @Test
+  void deleteResponeInvalid() throws IOException, InterruptedException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_BAD_REQUEST);
+    when(response.body()).thenReturn("error");
+
+    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+        .thenReturn(response);
+
+    assertFalse(tc.delete(URI.create("http://delete-this-link.com")));
   }
 }
