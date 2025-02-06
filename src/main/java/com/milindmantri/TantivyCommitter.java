@@ -6,6 +6,7 @@ import com.norconex.committer.core3.DeleteRequest;
 import com.norconex.committer.core3.UpsertRequest;
 import com.norconex.commons.lang.xml.XML;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.stream.Collectors;
@@ -30,13 +31,26 @@ public class TantivyCommitter extends AbstractCommitter {
       throw new IllegalArgumentException("upsertRequest must not be null.");
     }
 
-    client.delete(URI.create(upsertRequest.getReference()));
-    client.index(
-        URI.create(upsertRequest.getReference()),
-        upsertRequest.getMetadata().getString("title"),
-        new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
-            .lines()
-            .collect(Collectors.joining()));
+    try {
+      client.delete(URI.create(upsertRequest.getReference()));
+    } catch (IOException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+
+    if (upsertRequest.getMetadata().containsKey("title")) {
+      client.index(
+          URI.create(upsertRequest.getReference()),
+          upsertRequest.getMetadata().getString("title"),
+          new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
+              .lines()
+              .collect(Collectors.joining()));
+    } else {
+      client.index(
+          URI.create(upsertRequest.getReference()),
+          new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
+              .lines()
+              .collect(Collectors.joining()));
+    }
   }
 
   @Override
