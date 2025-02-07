@@ -68,8 +68,11 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
                 <configuration>
+                    <!-- https://docs.oracle.com/en/java/javase/17/migrate/migrating-jdk-8-later-jdk-releases.html#GUID-12F945EB-71D6-46AF-8C3D-D354FD0B1781 -->
+                    <!-- HttpRequest equals does not validate body -->
                     <argLine>
                         -javaagent:${settings.localRepository}/org/mockito/mockito-core/5.15.2/mockito-core-5.15.2.jar
+                        --add-opens java.net.http/jdk.internal.net.http=ALL-UNNAMED
                     </argLine>
                 </configuration>
             </plugin>

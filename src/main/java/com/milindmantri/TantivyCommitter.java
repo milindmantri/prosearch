@@ -38,12 +38,16 @@ public class TantivyCommitter extends AbstractCommitter {
     }
 
     if (upsertRequest.getMetadata().containsKey("title")) {
-      client.index(
-          URI.create(upsertRequest.getReference()),
-          upsertRequest.getMetadata().getString("title"),
-          new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
-              .lines()
-              .collect(Collectors.joining()));
+      try {
+        client.index(
+            URI.create(upsertRequest.getReference()),
+            upsertRequest.getMetadata().getString("title"),
+            new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
+                .lines()
+                .collect(Collectors.joining()));
+      } catch (IOException | InterruptedException e) {
+        throw new RuntimeException(e);
+      }
     } else {
       client.index(
           URI.create(upsertRequest.getReference()),

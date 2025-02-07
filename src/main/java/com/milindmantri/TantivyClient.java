@@ -1,5 +1,6 @@
 package com.milindmantri;
 
+import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -33,7 +34,21 @@ public class TantivyClient {
     return response.statusCode() == HttpURLConnection.HTTP_OK && "true".equals(response.body());
   }
 
-  boolean index(final URI uri, final String title, final String body) {
+  boolean index(final URI uri, final String title, final String body)
+      throws IOException, InterruptedException {
+
+    var obj = new JsonObject();
+    obj.addProperty("url", uri.toString());
+    obj.addProperty("title", title);
+    obj.addProperty("body", body);
+
+    HttpResponse<String> response =
+        this.httpClient.send(
+            HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(obj.toString()))
+                .uri(URI.create("%s/index/".formatted(this.host.toString())))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     return true;
   }
 
