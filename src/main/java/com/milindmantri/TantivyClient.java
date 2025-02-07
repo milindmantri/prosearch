@@ -53,7 +53,7 @@ public class TantivyClient {
     return response.statusCode() == HttpURLConnection.HTTP_OK && "true".equals(response.body());
   }
 
-  boolean index(final URI uri, final String body) {
-    return true;
+  boolean index(final URI uri, final String body) throws IOException, InterruptedException {
+    return this.index(uri, uri.toString(), body);
   }
 }

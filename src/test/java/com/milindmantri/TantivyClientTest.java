@@ -191,4 +191,35 @@ class TantivyClientTest {
             "My \"Quoted\" Title",
             "\"Quoted\" content to index"));
   }
+
+  @Test
+  void indexWithoutTitle() throws IOException, InterruptedException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    var httpRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create("http://localhost/index/"))
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    """
+            {"url":"http://index-this-link.com"\
+            ,"title":"http://index-this-link.com"\
+            ,"body":"\\"Quoted\\" content to index"\
+            }\
+            """))
+            .build();
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn("true");
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
+
+    assertTrue(tc.index(URI.create("http://index-this-link.com"), "\"Quoted\" content to index"));
+
+    Mockito.verify(httpClient, times(1))
+        .send(argThat(new HttpRequestPostBody(httpRequest)), any(HttpResponse.BodyHandler.class));
+  }
 }
