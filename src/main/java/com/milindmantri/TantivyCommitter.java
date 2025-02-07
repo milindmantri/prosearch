@@ -33,11 +33,7 @@ public class TantivyCommitter extends AbstractCommitter {
 
     try {
       client.delete(URI.create(upsertRequest.getReference()));
-    } catch (IOException | InterruptedException e) {
-      throw new RuntimeException(e);
-    }
 
-    try {
       if (upsertRequest.getMetadata().containsKey("title")) {
         client.index(
             URI.create(upsertRequest.getReference()),
