@@ -96,7 +96,7 @@ class TantivyClientTest {
   }
 
   @Test
-  void deleteResponeInvalid() throws IOException, InterruptedException {
+  void deleteResponseInvalid() throws IOException, InterruptedException {
     HttpClient httpClient = Mockito.mock(HttpClient.class);
     URI host = URI.create("http://localhost");
     var tc = new TantivyClient(httpClient, host);
