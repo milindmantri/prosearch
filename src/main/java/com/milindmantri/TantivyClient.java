@@ -49,7 +49,8 @@ public class TantivyClient {
                 .uri(URI.create("%s/index/".formatted(this.host.toString())))
                 .build(),
             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-    return true;
+
+    return response.statusCode() == HttpURLConnection.HTTP_OK && "true".equals(response.body());
   }
 
   boolean index(final URI uri, final String body) {

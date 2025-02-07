@@ -67,7 +67,13 @@ class TantivyClientTest {
     URI host = URI.create("http://localhost");
     var tc = new TantivyClient(httpClient, host);
 
-    tc.delete(URI.create("http://delete-this-link.com"));
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn("true");
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
+
+    assertTrue(tc.delete(URI.create("http://delete-this-link.com")));
 
     Mockito.verify(httpClient, times(1))
         .send(
@@ -80,7 +86,7 @@ class TantivyClientTest {
   }
 
   @Test
-  void deleteResponeValid() throws IOException, InterruptedException {
+  void deleteResponseValid() throws IOException, InterruptedException {
     HttpClient httpClient = Mockito.mock(HttpClient.class);
     URI host = URI.create("http://localhost");
     var tc = new TantivyClient(httpClient, host);
@@ -117,11 +123,6 @@ class TantivyClientTest {
     URI host = URI.create("http://localhost");
     var tc = new TantivyClient(httpClient, host);
 
-    tc.index(
-        URI.create("http://index-this-link.com"),
-        "My \"Quoted\" Title",
-        "\"Quoted\" content to index");
-
     var httpRequest =
         HttpRequest.newBuilder()
             .uri(URI.create("http://localhost/index/"))
@@ -135,7 +136,59 @@ class TantivyClientTest {
                     """))
             .build();
 
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn("true");
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
+
+    assertTrue(
+        tc.index(
+            URI.create("http://index-this-link.com"),
+            "My \"Quoted\" Title",
+            "\"Quoted\" content to index"));
+
     Mockito.verify(httpClient, times(1))
         .send(argThat(new HttpRequestPostBody(httpRequest)), any(HttpResponse.BodyHandler.class));
+  }
+
+  @Test
+  void indexWithTitleValidResponse() throws IOException, InterruptedException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn("true");
+
+    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+        .thenReturn(response);
+
+    assertTrue(
+        tc.index(
+            URI.create("http://index-this-link.com"),
+            "My \"Quoted\" Title",
+            "\"Quoted\" content to index"));
+  }
+
+  @Test
+  void indexWithTitleInvalidResponse() throws IOException, InterruptedException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_BAD_REQUEST);
+    when(response.body()).thenReturn("Some error");
+
+    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+        .thenReturn(response);
+
+    assertFalse(
+        tc.index(
+            URI.create("http://index-this-link.com"),
+            "My \"Quoted\" Title",
+            "\"Quoted\" content to index"));
   }
 }
