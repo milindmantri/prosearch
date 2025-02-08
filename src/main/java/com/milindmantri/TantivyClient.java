@@ -46,6 +46,7 @@ public class TantivyClient {
         this.httpClient.send(
             HttpRequest.newBuilder()
                 .POST(HttpRequest.BodyPublishers.ofString(obj.toString()))
+                .header("Content-Type", "application/json")
                 .uri(URI.create("%s/index/".formatted(this.host.toString())))
                 .build(),
             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));

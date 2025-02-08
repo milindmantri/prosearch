@@ -55,7 +55,18 @@ public class TantivyCommitter extends AbstractCommitter {
 
   @Override
   protected void doDelete(final DeleteRequest deleteRequest) throws CommitterException {
-    // TODO: Implement
+    if (deleteRequest == null) {
+      throw new IllegalArgumentException("deleteRequest must not be null.");
+    }
+
+    try {
+      if (!client.delete(URI.create(deleteRequest.getReference()))) {
+        throw new RuntimeException("Didn't delete: %s".formatted(deleteRequest));
+      }
+      ;
+    } catch (IOException | InterruptedException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

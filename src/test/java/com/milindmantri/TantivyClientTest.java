@@ -126,6 +126,7 @@ class TantivyClientTest {
     var httpRequest =
         HttpRequest.newBuilder()
             .uri(URI.create("http://localhost/index/"))
+            .header("Content-Type", "application/json")
             .POST(
                 HttpRequest.BodyPublishers.ofString(
                     """
@@ -201,6 +202,7 @@ class TantivyClientTest {
     var httpRequest =
         HttpRequest.newBuilder()
             .uri(URI.create("http://localhost/index/"))
+            .header("Content-Type", "application/json")
             .POST(
                 HttpRequest.BodyPublishers.ofString(
                     """

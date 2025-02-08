@@ -5,6 +5,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 
 import com.norconex.committer.core3.CommitterException;
+import com.norconex.committer.core3.DeleteRequest;
 import com.norconex.committer.core3.UpsertRequest;
 import com.norconex.commons.lang.map.Properties;
 import java.io.ByteArrayInputStream;
@@ -70,5 +71,19 @@ class TantivyCommitterTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> new TantivyCommitter(Mockito.mock(TantivyClient.class)).doUpsert(null));
+  }
+
+  @Test
+  void doDelete() throws CommitterException, IOException, InterruptedException {
+    var client = Mockito.mock(TantivyClient.class);
+
+    try (var tc = new TantivyCommitter(client)) {
+
+      var props = new Properties(Map.of("title", List.of("Example Title")));
+
+      tc.doDelete(new DeleteRequest("http://example.com", props));
+
+      Mockito.verify(client, times(1)).delete(URI.create("http://example.com"));
+    }
   }
 }
