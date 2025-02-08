@@ -96,7 +96,9 @@ impl IndexServer {
         // Do AND for query terms instead of OR
         query_parser.set_conjunction_by_default();
 
-        // TODO: Prefer title matches first
+        // TODO: Default boost, if not set is 1.0
+        // https://github.com/quickwit-oss/tantivy/blob/4aa8cd24707be1255599284f52eb6d388cf86ae8/src/query/query_parser/query_parser.rs#L687
+        query_parser.set_field_boost(title_field, 2.0);
 
         let reader = index.reader()?;
         let writer : IndexWriter = index.writer(50_000_000)?;
@@ -122,6 +124,8 @@ impl IndexServer {
             .query_parser
             .parse_query(&q)
             .expect("Parsing the query failed");
+        // TODO: Maybe use parse_query_lenient when parsing fails?
+
         let searcher = self.reader.searcher();
         let mut timer_tree = TimerTree::default();
         let (top_docs, num_hits) = {
