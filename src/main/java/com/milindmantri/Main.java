@@ -42,6 +42,7 @@ public class Main {
     urlCrawlScope.setIncludeSubdomains(false);
     crawlerConfig.setUrlCrawlScopeStrategy(urlCrawlScope);
 
+    crawlerConfig.setIgnoreCanonicalLinks(true);
     crawlerConfig.setFetchHttpHead(true);
     crawlerConfig.setMetadataFilters(getTextOnlyMetadataFilters().toList());
 

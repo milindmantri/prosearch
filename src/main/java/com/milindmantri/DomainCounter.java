@@ -75,6 +75,13 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
   @Override
   public void accept(final Event event) {
+    // TODO: When non-canonical links are processed (previously enqueued) with the host count
+    // limit reached, canonical refs are rejected by DomainCounter which is a problem since,
+    // we want to follow canonical link and index it instead of the enqueued non-canonical.
+
+    // Unfortunately, only a REJECTED_NONCANONICAL is thrown. We need something like a
+    // FOUND_CANONICAL to process correctly even when the host count limit is reached. Until then,
+    // ignoring canonical links (CrawlerConfig).
 
     if (event.is(CrawlerEvent.CRAWLER_INIT_BEGIN)) {
       // create table
@@ -89,12 +96,14 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
-    } else if (event.is(CrawlerEvent.CRAWLER_RUN_END)) {
+    } else if (event.is(CrawlerEvent.CRAWLER_RUN_END) || event.is(CrawlerEvent.CRAWLER_CLEAN_END)) {
       try (var con = this.dataSource.getConnection();
           // TODO: IF EXISTS?
           var createTablePs = con.prepareStatement("DROP TABLE host_count")) {
 
         createTablePs.executeUpdate();
+
+        count.clear();
 
       } catch (SQLException e) {
         throw new RuntimeException(e);
