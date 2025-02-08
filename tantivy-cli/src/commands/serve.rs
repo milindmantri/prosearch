@@ -32,8 +32,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use tantivy::collector::{Count, TopDocs};
 use tantivy::query::QueryParser;
-use tantivy::schema::Field;
-use tantivy::schema::FieldType;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::schema::Schema;
 use tantivy::schema::Term;
@@ -85,18 +83,21 @@ impl IndexServer {
     fn load(path: &Path) -> tantivy::Result<IndexServer> {
         let index = Index::open_in_dir(path)?;
         let schema = index.schema();
-        let default_fields: Vec<Field> = schema
-            .fields()
-            .filter(|&(_, field_entry)| match field_entry.field_type() {
-                FieldType::Str(ref text_field_options) => {
-                    text_field_options.get_indexing_options().is_some()
-                }
-                _ => false,
-            })
-            .map(|(field, _)| field)
-            .collect();
-        let query_parser =
-            QueryParser::new(schema.clone(), default_fields, index.tokenizers().clone());
+
+        // Improve searching and ranking,
+        // Don't search in urls unless specified
+        let title_field = schema.get_field("title").unwrap();
+        let body_field = schema.get_field("body").unwrap();
+        let search_fields = vec![title_field, body_field];
+
+        let mut query_parser =
+            QueryParser::for_index(&index, search_fields);
+
+        // Do AND for query terms instead of OR
+        query_parser.set_conjunction_by_default();
+
+        // TODO: Prefer title matches first
+
         let reader = index.reader()?;
         let writer : IndexWriter = index.writer(50_000_000)?;
         Ok(IndexServer {
