@@ -9,6 +9,8 @@ import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.commons.lang.text.TextMatcher;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.net.URI;
+import java.net.http.HttpClient;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +54,15 @@ public class Main {
       var domainCounter = new DomainCounter(PER_HOST_CRAWLING_LIMIT, dataSource);
       crawlerConfig.setEventListeners(domainCounter);
       crawlerConfig.setReferenceFilters(domainCounter);
+
+      crawlerConfig.setCommitters(
+          new TantivyCommitter(
+              new TantivyClient(
+                  HttpClient.newBuilder()
+                      .followRedirects(HttpClient.Redirect.NORMAL)
+                      .version(HttpClient.Version.HTTP_1_1)
+                      .build(),
+                  URI.create(System.getProperty("tantivy-server", "http://localhost:3000")))));
 
       config.setCrawlerConfigs(crawlerConfig);
 
