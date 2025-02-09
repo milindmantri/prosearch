@@ -77,12 +77,16 @@ public class TantivyCommitter extends AbstractCommitter {
       throw new IllegalArgumentException("deleteRequest must not be null.");
     }
 
+    final URI uri = URI.create(deleteRequest.getReference());
+
     try {
-      if (!client.delete(URI.create(deleteRequest.getReference()))) {
+      if (!client.delete(uri)) {
         throw new CommitterException(
             "Could not process delete request for %s".formatted(deleteRequest));
+      } else {
+        deleteFromDomainStats(uri);
       }
-    } catch (IOException | InterruptedException e) {
+    } catch (IOException | InterruptedException | SQLException e) {
       throw new RuntimeException(e);
     }
   }

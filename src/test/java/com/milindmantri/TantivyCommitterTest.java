@@ -247,6 +247,53 @@ class TantivyCommitterTest {
     }
   }
 
+  @Test
+  void deleteDomainStatsExistingEntry()
+      throws IOException, InterruptedException, CommitterException, SQLException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+
+    try (var tc = new TantivyCommitter(client, datasource);
+        var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
+
+      con.createStatement()
+          .executeUpdate(
+              """
+          INSERT INTO domain_stats (host, url, length)
+          VALUES ('http://example.com', 'http://example.com/hello-world', 7)
+          """);
+
+      var props = new Properties(Map.of("title", List.of("Example Title")));
+
+      assertDoesNotThrow(
+          () -> tc.doDelete(new DeleteRequest("http://example.com/hello-world", props)));
+
+      var rs = ps.executeQuery();
+      assertFalse(rs.next());
+    }
+  }
+
+  @Test
+  void deleteDomainStatsNonExistingEntry()
+      throws IOException, InterruptedException, CommitterException, SQLException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+
+    try (var tc = new TantivyCommitter(client, datasource);
+        var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
+
+      var props = new Properties(Map.of("title", List.of("Example Title")));
+
+      assertDoesNotThrow(
+          () -> tc.doDelete(new DeleteRequest("http://example.com/hello-world", props)));
+
+      var rs = ps.executeQuery();
+      assertFalse(rs.next());
+    }
+  }
+
   @AfterAll
   static void closeDataSource() {
     datasource.close();
