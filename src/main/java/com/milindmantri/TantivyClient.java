@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 public class TantivyClient {
 
@@ -34,7 +35,7 @@ public class TantivyClient {
     return response.statusCode() == HttpURLConnection.HTTP_OK && "true".equals(response.body());
   }
 
-  boolean index(final URI uri, final String title, final String body)
+  Optional<Long> indexAndLength(final URI uri, final String title, final String body)
       throws IOException, InterruptedException {
 
     var obj = new JsonObject();
@@ -51,9 +52,21 @@ public class TantivyClient {
                 .build(),
             HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
-    return response.statusCode() == HttpURLConnection.HTTP_OK && "true".equals(response.body());
+    if (response.statusCode() == HttpURLConnection.HTTP_OK) {
+      return Optional.of(Long.parseLong(response.body()));
+    } else {
+      return Optional.empty();
+    }
   }
 
+  @Deprecated
+  boolean index(final URI uri, final String title, final String body)
+      throws IOException, InterruptedException {
+
+    return indexAndLength(uri, title, body).isPresent();
+  }
+
+  @Deprecated
   boolean index(final URI uri, final String body) throws IOException, InterruptedException {
     return this.index(uri, uri.toString(), body);
   }

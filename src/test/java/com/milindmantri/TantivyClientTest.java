@@ -138,7 +138,7 @@ class TantivyClientTest {
             .build();
 
     HttpResponse<String> response = Mockito.mock(HttpResponse.class);
-    when(response.body()).thenReturn("true");
+    when(response.body()).thenReturn("7");
     when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
 
     Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
@@ -161,7 +161,7 @@ class TantivyClientTest {
 
     HttpResponse<String> response = Mockito.mock(HttpResponse.class);
     when(response.statusCode()).thenReturn(200);
-    when(response.body()).thenReturn("true");
+    when(response.body()).thenReturn("8");
 
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(response);
@@ -171,6 +171,29 @@ class TantivyClientTest {
             URI.create("http://index-this-link.com"),
             "My \"Quoted\" Title",
             "\"Quoted\" content to index"));
+  }
+
+  @Test
+  void indexAndLengthValidResponse() throws IOException, InterruptedException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.statusCode()).thenReturn(200);
+    when(response.body()).thenReturn("6");
+
+    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+        .thenReturn(response);
+
+    var maybeLength =
+        tc.indexAndLength(
+            URI.create("http://index-this-link.com"),
+            "My \"Quoted\" Title",
+            "\"Quoted\" content to index");
+
+    assertTrue(maybeLength.isPresent());
+    assertEquals(6, maybeLength.get());
   }
 
   @Test
@@ -214,7 +237,7 @@ class TantivyClientTest {
             .build();
 
     HttpResponse<String> response = Mockito.mock(HttpResponse.class);
-    when(response.body()).thenReturn("true");
+    when(response.body()).thenReturn("6");
     when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
 
     Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
