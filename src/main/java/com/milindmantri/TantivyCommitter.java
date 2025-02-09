@@ -34,21 +34,29 @@ public class TantivyCommitter extends AbstractCommitter {
     // TODO: Add stats for indexed pages per domain
 
     try {
-      client.delete(URI.create(upsertRequest.getReference()));
+      boolean deleteResult = client.delete(URI.create(upsertRequest.getReference()));
 
-      if (upsertRequest.getMetadata().containsKey("title")) {
-        client.index(
-            URI.create(upsertRequest.getReference()),
-            upsertRequest.getMetadata().getString("title"),
-            new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
-                .lines()
-                .collect(Collectors.joining()));
+      boolean indexResult =
+          upsertRequest.getMetadata().containsKey("title")
+              ? client.index(
+                  URI.create(upsertRequest.getReference()),
+                  upsertRequest.getMetadata().getString("title"),
+                  new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
+                      .lines()
+                      .collect(Collectors.joining()))
+              : client.index(
+                  URI.create(upsertRequest.getReference()),
+                  new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
+                      .lines()
+                      .collect(Collectors.joining()));
+
+      if (deleteResult && indexResult) {
+        // TODO: Insert into DB
       } else {
-        client.index(
-            URI.create(upsertRequest.getReference()),
-            new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
-                .lines()
-                .collect(Collectors.joining()));
+        throw new CommitterException(
+            String.format(
+                "Upsert failed for request, %s, because delete op was %s and index op was %s",
+                upsertRequest, deleteResult, indexResult));
       }
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
