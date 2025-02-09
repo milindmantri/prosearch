@@ -7,6 +7,8 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.util.Properties;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class MainTest {
@@ -19,6 +21,15 @@ class MainTest {
   @AfterAll
   static void closeDataSource() {
     datasource.close();
+  }
+
+  @AfterEach
+  @BeforeEach
+  void dropTable() throws SQLException {
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("DROP TABLE IF EXISTS domain_stats")) {
+      ps.executeUpdate();
+    }
   }
 
   @Test
