@@ -65,7 +65,7 @@ class TantivyCommitterTest {
     Mockito.when(client.delete(Mockito.any())).thenReturn(false);
     Mockito.when(client.index(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(true);
 
-    try (var tc = new TantivyCommitter(client)) {
+    try (var tc = new TantivyCommitter(client, datasource)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -86,7 +86,7 @@ class TantivyCommitterTest {
     Mockito.when(client.delete(Mockito.any())).thenReturn(false);
     Mockito.when(client.index(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(true);
 
-    try (var tc = new TantivyCommitter(client)) {
+    try (var tc = new TantivyCommitter(client, datasource)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -126,14 +126,21 @@ class TantivyCommitterTest {
 
   @Test
   void nullClient() {
-    assertThrows(IllegalArgumentException.class, () -> new TantivyCommitter(null));
+    assertThrows(IllegalArgumentException.class, () -> new TantivyCommitter(null, datasource));
+  }
+
+  @Test
+  void nullDatasource() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new TantivyCommitter(Mockito.mock(TantivyClient.class), null));
   }
 
   @Test
   void nullUpsert() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> new TantivyCommitter(Mockito.mock(TantivyClient.class)).doUpsert(null));
+        () -> new TantivyCommitter(Mockito.mock(TantivyClient.class), datasource).doUpsert(null));
   }
 
   @Test
@@ -141,7 +148,7 @@ class TantivyCommitterTest {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
 
-    try (var tc = new TantivyCommitter(client)) {
+    try (var tc = new TantivyCommitter(client, datasource)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -156,7 +163,7 @@ class TantivyCommitterTest {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(false);
 
-    try (var tc = new TantivyCommitter(client)) {
+    try (var tc = new TantivyCommitter(client, datasource)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 

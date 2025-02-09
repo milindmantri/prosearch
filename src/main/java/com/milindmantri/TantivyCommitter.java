@@ -21,17 +21,6 @@ public class TantivyCommitter extends AbstractCommitter {
   private final TantivyClient client;
   private final DataSource datasource;
 
-  @Deprecated
-  public TantivyCommitter(final TantivyClient client) {
-    if (client == null) {
-      throw new IllegalArgumentException("client must not be null.");
-    }
-    this.client = client;
-
-    // TODO: fix;
-    this.datasource = null;
-  }
-
   public TantivyCommitter(final TantivyClient client, final DataSource datasource) {
     if (client == null) {
       throw new IllegalArgumentException("client must not be null.");

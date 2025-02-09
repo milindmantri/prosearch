@@ -6,7 +6,6 @@ import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
-import com.norconex.collector.http.delay.impl.AbstractDelayResolver;
 import com.norconex.commons.lang.text.TextMatcher;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -87,7 +86,8 @@ public class Main {
                       .followRedirects(HttpClient.Redirect.NORMAL)
                       .version(HttpClient.Version.HTTP_1_1)
                       .build(),
-                  URI.create(System.getProperty("tantivy-server", "http://localhost:3000")))));
+                  URI.create(System.getProperty("tantivy-server", "http://localhost:3000"))),
+              dataSource));
 
       config.setCrawlerConfigs(crawlerConfig);
 
