@@ -76,12 +76,30 @@ class TantivyCommitterTest {
   @Test
   void doDelete() throws CommitterException, IOException, InterruptedException {
     var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
 
     try (var tc = new TantivyCommitter(client)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
-      tc.doDelete(new DeleteRequest("http://example.com", props));
+      assertDoesNotThrow(() -> tc.doDelete(new DeleteRequest("http://example.com", props)));
+
+      Mockito.verify(client, times(1)).delete(URI.create("http://example.com"));
+    }
+  }
+
+  @Test
+  void doDeleteFailed() throws CommitterException, IOException, InterruptedException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(false);
+
+    try (var tc = new TantivyCommitter(client)) {
+
+      var props = new Properties(Map.of("title", List.of("Example Title")));
+
+      assertThrows(
+          CommitterException.class,
+          () -> tc.doDelete(new DeleteRequest("http://example.com", props)));
 
       Mockito.verify(client, times(1)).delete(URI.create("http://example.com"));
     }

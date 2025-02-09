@@ -63,9 +63,9 @@ public class TantivyCommitter extends AbstractCommitter {
 
     try {
       if (!client.delete(URI.create(deleteRequest.getReference()))) {
-        throw new RuntimeException("Didn't delete: %s".formatted(deleteRequest));
+        throw new CommitterException(
+            "Could not process delete request for %s".formatted(deleteRequest));
       }
-      ;
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
     }
