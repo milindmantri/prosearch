@@ -65,16 +65,4 @@ public class TantivyClient {
       throws IOException, InterruptedException {
     return this.indexAndLength(uri, uri.toString(), body);
   }
-
-  @Deprecated
-  boolean index(final URI uri, final String title, final String body)
-      throws IOException, InterruptedException {
-
-    return indexAndLength(uri, title, body).isPresent();
-  }
-
-  @Deprecated
-  boolean index(final URI uri, final String body) throws IOException, InterruptedException {
-    return this.index(uri, uri.toString(), body);
-  }
 }

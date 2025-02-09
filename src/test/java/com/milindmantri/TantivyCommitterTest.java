@@ -63,7 +63,8 @@ class TantivyCommitterTest {
   void doUpsertDeleteFails() throws CommitterException, IOException, InterruptedException {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(false);
-    Mockito.when(client.index(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of(7L));
 
     try (var tc = new TantivyCommitter(client, datasource)) {
 
@@ -84,7 +85,8 @@ class TantivyCommitterTest {
   void doUpsertIndexFails() throws CommitterException, IOException, InterruptedException {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(false);
-    Mockito.when(client.index(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of(7L));
 
     try (var tc = new TantivyCommitter(client, datasource)) {
 

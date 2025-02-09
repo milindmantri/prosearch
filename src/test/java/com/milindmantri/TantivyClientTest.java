@@ -144,10 +144,11 @@ class TantivyClientTest {
     Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
 
     assertTrue(
-        tc.index(
-            URI.create("http://index-this-link.com"),
-            "My \"Quoted\" Title",
-            "\"Quoted\" content to index"));
+        tc.indexAndLength(
+                URI.create("http://index-this-link.com"),
+                "My \"Quoted\" Title",
+                "\"Quoted\" content to index")
+            .isPresent());
 
     Mockito.verify(httpClient, times(1))
         .send(argThat(new HttpRequestPostBody(httpRequest)), any(HttpResponse.BodyHandler.class));
@@ -167,10 +168,11 @@ class TantivyClientTest {
         .thenReturn(response);
 
     assertTrue(
-        tc.index(
-            URI.create("http://index-this-link.com"),
-            "My \"Quoted\" Title",
-            "\"Quoted\" content to index"));
+        tc.indexAndLength(
+                URI.create("http://index-this-link.com"),
+                "My \"Quoted\" Title",
+                "\"Quoted\" content to index")
+            .isPresent());
   }
 
   @Test
@@ -210,10 +212,11 @@ class TantivyClientTest {
         .thenReturn(response);
 
     assertFalse(
-        tc.index(
-            URI.create("http://index-this-link.com"),
-            "My \"Quoted\" Title",
-            "\"Quoted\" content to index"));
+        tc.indexAndLength(
+                URI.create("http://index-this-link.com"),
+                "My \"Quoted\" Title",
+                "\"Quoted\" content to index")
+            .isPresent());
   }
 
   @Test
@@ -242,7 +245,9 @@ class TantivyClientTest {
 
     Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
 
-    assertTrue(tc.index(URI.create("http://index-this-link.com"), "\"Quoted\" content to index"));
+    assertTrue(
+        tc.indexAndLength(URI.create("http://index-this-link.com"), "\"Quoted\" content to index")
+            .isPresent());
 
     Mockito.verify(httpClient, times(1))
         .send(argThat(new HttpRequestPostBody(httpRequest)), any(HttpResponse.BodyHandler.class));
