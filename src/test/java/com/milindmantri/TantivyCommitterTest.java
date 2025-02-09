@@ -23,16 +23,20 @@ class TantivyCommitterTest {
   @Test
   void doUpsert() throws CommitterException, IOException, InterruptedException {
     var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+    Mockito.when(client.index(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(true);
 
     try (var tc = new TantivyCommitter(client)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
-      tc.doUpsert(
-          new UpsertRequest(
-              "http://example.com",
-              props,
-              new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8))));
+      assertDoesNotThrow(
+          () ->
+              tc.doUpsert(
+                  new UpsertRequest(
+                      "http://example.com",
+                      props,
+                      new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
 
       InOrder inOrder = inOrder(client);
       inOrder.verify(client, times(1)).delete(URI.create("http://example.com"));
