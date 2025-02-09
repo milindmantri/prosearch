@@ -35,6 +35,7 @@ use tantivy::query::QueryParser;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::schema::Schema;
 use tantivy::schema::Term;
+use tantivy::schema::OwnedValue;
 use tantivy::Document;
 use tantivy::Index;
 use tantivy::{IndexReader, IndexWriter};
@@ -96,7 +97,7 @@ impl IndexServer {
         // Do AND for query terms instead of OR
         query_parser.set_conjunction_by_default();
 
-        // TODO: Default boost, if not set is 1.0
+        // Default boost, if not set is 1.0
         // https://github.com/quickwit-oss/tantivy/blob/4aa8cd24707be1255599284f52eb6d388cf86ae8/src/query/query_parser/query_parser.rs#L687
         query_parser.set_field_boost(title_field, 2.0);
 
@@ -202,6 +203,14 @@ impl IndexServer {
         return None;
     }
 
+    fn get_length(&self, doc: &TantivyDocument, field_name: &str) -> tantivy::Result<usize> {
+        let field = self.schema.get_field(field_name).unwrap();
+        return match (*doc).get_first(field).unwrap().into() {
+            OwnedValue::Str(string) => Ok(string.len()),
+            _ => Err(InvalidArgument("Field value must be of string type.".to_string()))
+        };
+    }
+
     fn index_json(&mut self, json: serde_json::Value) -> tantivy::Result<String> {
 
         // validate json since tantivy will also accept empty docs and we want to ensure all fields
@@ -213,11 +222,15 @@ impl IndexServer {
         let json_str : &str = &serde_json::to_string(&json).unwrap();
         match TantivyDocument::parse_json(&self.schema, json_str) {
             Ok(doc) => {
+                let content_length =
+                      self.get_length(&doc, "body").unwrap()
+                    + self.get_length(&doc, "title").unwrap();
+
                 let writer = &mut self.writer;
                 let _ = writer.add_document(doc);
                 let _ = writer.commit();
                 let _ = self.reader.reload();
-                Ok("true".to_string())
+                Ok(content_length.to_string())
             }
             Err(err) => Err(err.into())
         }
