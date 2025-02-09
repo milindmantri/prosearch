@@ -209,6 +209,44 @@ class TantivyCommitterTest {
     }
   }
 
+  @Test
+  void upsertInsertsIntoDomainStatsExistingEntry()
+      throws IOException, InterruptedException, CommitterException, SQLException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of(6L));
+
+    try (var tc = new TantivyCommitter(client, datasource);
+        var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
+
+      con.createStatement()
+          .executeUpdate(
+              """
+              INSERT INTO domain_stats (host, url, length)
+              VALUES ('http://example.com', 'http://example.com/hello-world', 7)
+              """);
+
+      var props = new Properties(Map.of("title", List.of("Example Title")));
+
+      assertDoesNotThrow(
+          () ->
+              tc.doUpsert(
+                  new UpsertRequest(
+                      "http://example.com/hello-world",
+                      props,
+                      new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
+
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals("http://example.com", rs.getString(1));
+      assertEquals("http://example.com/hello-world", rs.getString(2));
+      assertEquals(6, rs.getLong(3));
+      assertFalse(rs.next());
+    }
+  }
+
   @AfterAll
   static void closeDataSource() {
     datasource.close();

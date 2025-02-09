@@ -58,22 +58,8 @@ public class TantivyCommitter extends AbstractCommitter {
               : client.indexAndLength(uri, inputStreamReader(upsertRequest.getContent()));
 
       if (deleteResult && maybeIndexedBytesLength.isPresent()) {
-        // TODO: Insert into DB
-        try (var con = this.datasource.getConnection();
-            var ps =
-                con.prepareStatement(
-                    "INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
-          ps.setString(
-              1,
-              "%s://%s"
-                  .formatted(
-                      Objects.requireNonNull(uri.getScheme()),
-                      Objects.requireNonNull(uri.getAuthority())));
-
-          ps.setString(2, uri.toString());
-          ps.setLong(3, maybeIndexedBytesLength.get());
-          ps.executeUpdate();
-        }
+        deleteFromDomainStats(uri);
+        insertIntoDomainStats(uri, maybeIndexedBytesLength.get());
       } else {
         throw new CommitterException(
             String.format(
@@ -123,5 +109,37 @@ public class TantivyCommitter extends AbstractCommitter {
 
   private static String inputStreamReader(final InputStream is) {
     return new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
+  }
+
+  private void insertIntoDomainStats(final URI uri, final long length) throws SQLException {
+    try (var con = this.datasource.getConnection();
+        var ps =
+            con.prepareStatement("INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
+      ps.setString(
+          1,
+          "%s://%s"
+              .formatted(
+                  Objects.requireNonNull(uri.getScheme()),
+                  Objects.requireNonNull(uri.getAuthority())));
+
+      ps.setString(2, uri.toString());
+      ps.setLong(3, length);
+      ps.executeUpdate();
+    }
+  }
+
+  private void deleteFromDomainStats(final URI uri) throws SQLException {
+    try (var con = this.datasource.getConnection();
+        var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
+      ps.setString(
+          1,
+          "%s://%s"
+              .formatted(
+                  Objects.requireNonNull(uri.getScheme()),
+                  Objects.requireNonNull(uri.getAuthority())));
+
+      ps.setString(2, uri.toString());
+      ps.executeUpdate();
+    }
   }
 }
