@@ -8,25 +8,38 @@ import com.norconex.committer.core3.CommitterException;
 import com.norconex.committer.core3.DeleteRequest;
 import com.norconex.committer.core3.UpsertRequest;
 import com.norconex.commons.lang.map.Properties;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
 class TantivyCommitterTest {
 
+  // NOTE: Ensure PG is running on local and "test" DB exists.
+
+  private static final HikariDataSource datasource =
+      new HikariDataSource(new HikariConfig(dbProps()));
+
   @Test
   void doUpsert() throws CommitterException, IOException, InterruptedException {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
-    Mockito.when(client.index(Mockito.any(), Mockito.any(), Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client)) {
+    try (var tc = new TantivyCommitter(client, datasource)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -42,7 +55,7 @@ class TantivyCommitterTest {
       inOrder.verify(client, times(1)).delete(URI.create("http://example.com"));
       inOrder
           .verify(client, times(1))
-          .index(URI.create("http://example.com"), "Example Title", "content");
+          .indexAndLength(URI.create("http://example.com"), "Example Title", "content");
     }
   }
 
@@ -92,9 +105,9 @@ class TantivyCommitterTest {
   void upsertEmptyTitle() throws CommitterException, IOException, InterruptedException {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
-    Mockito.when(client.index(Mockito.any(), Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any())).thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client)) {
+    try (var tc = new TantivyCommitter(client, datasource)) {
       var emptyProps = new Properties();
 
       assertDoesNotThrow(
@@ -107,7 +120,7 @@ class TantivyCommitterTest {
 
       InOrder inOrder = inOrder(client);
       inOrder.verify(client, times(1)).delete(URI.create("http://example.com"));
-      inOrder.verify(client, times(1)).index(URI.create("http://example.com"), "content");
+      inOrder.verify(client, times(1)).indexAndLength(URI.create("http://example.com"), "content");
     }
   }
 
@@ -153,5 +166,64 @@ class TantivyCommitterTest {
 
       Mockito.verify(client, times(1)).delete(URI.create("http://example.com"));
     }
+  }
+
+  @Test
+  void upsertInsertsIntoDomainStats()
+      throws IOException, InterruptedException, CommitterException, SQLException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of(6L));
+
+    try (var tc = new TantivyCommitter(client, datasource);
+        var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
+
+      var props = new Properties(Map.of("title", List.of("Example Title")));
+
+      assertDoesNotThrow(
+          () ->
+              tc.doUpsert(
+                  new UpsertRequest(
+                      "http://example.com/hello-world",
+                      props,
+                      new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
+
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals("http://example.com", rs.getString(1));
+      assertEquals("http://example.com/hello-world", rs.getString(2));
+      assertEquals(6, rs.getLong(3));
+
+      assertFalse(rs.next());
+    }
+  }
+
+  @AfterAll
+  static void closeDataSource() {
+    datasource.close();
+  }
+
+  @BeforeEach
+  void createTable() throws SQLException {
+    Main.createStatsTableIfNotExists(datasource);
+  }
+
+  @AfterEach
+  void dropTable() throws SQLException {
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("DROP TABLE IF EXISTS domain_stats")) {
+      ps.executeUpdate();
+    }
+  }
+
+  private static java.util.Properties dbProps() {
+    var props = new java.util.Properties();
+    props.put("jdbcUrl", "jdbc:postgresql://localhost:5432/test");
+    props.put("username", "postgres");
+    props.put("password", "pass");
+
+    return props;
   }
 }

@@ -7,19 +7,42 @@ import com.norconex.committer.core3.UpsertRequest;
 import com.norconex.commons.lang.xml.XML;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.sql.SQLException;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.sql.DataSource;
 
 public class TantivyCommitter extends AbstractCommitter {
 
   private final TantivyClient client;
+  private final DataSource datasource;
 
+  @Deprecated
   public TantivyCommitter(final TantivyClient client) {
     if (client == null) {
       throw new IllegalArgumentException("client must not be null.");
     }
     this.client = client;
+
+    // TODO: fix;
+    this.datasource = null;
+  }
+
+  public TantivyCommitter(final TantivyClient client, final DataSource datasource) {
+    if (client == null) {
+      throw new IllegalArgumentException("client must not be null.");
+    }
+
+    if (datasource == null) {
+      throw new IllegalArgumentException("datasource must not be null.");
+    }
+
+    this.client = client;
+    this.datasource = datasource;
   }
 
   @Override
@@ -34,31 +57,41 @@ public class TantivyCommitter extends AbstractCommitter {
     // TODO: Add stats for indexed pages per domain
 
     try {
-      boolean deleteResult = client.delete(URI.create(upsertRequest.getReference()));
+      final URI uri = URI.create(upsertRequest.getReference());
+      boolean deleteResult = client.delete(uri);
 
-      boolean indexResult =
+      Optional<Long> maybeIndexedBytesLength =
           upsertRequest.getMetadata().containsKey("title")
-              ? client.index(
-                  URI.create(upsertRequest.getReference()),
+              ? client.indexAndLength(
+                  uri,
                   upsertRequest.getMetadata().getString("title"),
-                  new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
-                      .lines()
-                      .collect(Collectors.joining()))
-              : client.index(
-                  URI.create(upsertRequest.getReference()),
-                  new BufferedReader(new InputStreamReader(upsertRequest.getContent()))
-                      .lines()
-                      .collect(Collectors.joining()));
+                  inputStreamReader(upsertRequest.getContent()))
+              : client.indexAndLength(uri, inputStreamReader(upsertRequest.getContent()));
 
-      if (deleteResult && indexResult) {
+      if (deleteResult && maybeIndexedBytesLength.isPresent()) {
         // TODO: Insert into DB
+        try (var con = this.datasource.getConnection();
+            var ps =
+                con.prepareStatement(
+                    "INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
+          ps.setString(
+              1,
+              "%s://%s"
+                  .formatted(
+                      Objects.requireNonNull(uri.getScheme()),
+                      Objects.requireNonNull(uri.getAuthority())));
+
+          ps.setString(2, uri.toString());
+          ps.setLong(3, maybeIndexedBytesLength.get());
+          ps.executeUpdate();
+        }
       } else {
         throw new CommitterException(
             String.format(
                 "Upsert failed for request, %s, because delete op was %s and index op was %s",
-                upsertRequest, deleteResult, indexResult));
+                upsertRequest, deleteResult, maybeIndexedBytesLength));
       }
-    } catch (IOException | InterruptedException e) {
+    } catch (IOException | InterruptedException | SQLException e) {
       throw new RuntimeException(e);
     }
   }
@@ -97,5 +130,9 @@ public class TantivyCommitter extends AbstractCommitter {
   @Override
   public void saveCommitterToXML(final XML xml) {
     throw new UnsupportedOperationException("not yet implemented");
+  }
+
+  private static String inputStreamReader(final InputStream is) {
+    return new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
   }
 }

@@ -35,6 +35,7 @@ public class TantivyClient {
     return response.statusCode() == HttpURLConnection.HTTP_OK && "true".equals(response.body());
   }
 
+  /** When successful, returned long value is the length of indexed document, otherwise empty */
   Optional<Long> indexAndLength(final URI uri, final String title, final String body)
       throws IOException, InterruptedException {
 
@@ -57,6 +58,12 @@ public class TantivyClient {
     } else {
       return Optional.empty();
     }
+  }
+
+  /** When successful, returned long value is the length of indexed document, otherwise empty */
+  Optional<Long> indexAndLength(final URI uri, final String body)
+      throws IOException, InterruptedException {
+    return this.indexAndLength(uri, uri.toString(), body);
   }
 
   @Deprecated
