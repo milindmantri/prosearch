@@ -6,6 +6,7 @@ import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
+import com.norconex.collector.http.delay.impl.AbstractDelayResolver;
 import com.norconex.commons.lang.text.TextMatcher;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -15,10 +16,31 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.sql.DataSource;
 
 public class Main {
 
   private static final int PER_HOST_CRAWLING_LIMIT = 10_000;
+
+  private static final String CREATE_DOMAIN_STATS_TABLE =
+      """
+      CREATE TABLE IF NOT EXISTS
+        domain_stats (
+            host   VARCHAR NOT NULL
+          , url    VARCHAR NOT NULL
+          , length bigint  NOT NULL
+        );
+      """;
+
+  private static final String CREATE_DOMAIN_STATS_INDEX =
+      """
+      CREATE UNIQUE INDEX IF NOT EXISTS
+        domain_stats_idx
+      ON domain_stats (
+          host
+        , url
+      )
+      """;
 
   public static void main(String[] args) throws SQLException {
     // Why even allow for new HttpCollector(), when setting id is required. It will anyway error.
@@ -49,6 +71,8 @@ public class Main {
     try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine();
         var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()))) {
 
+      createStatsTableIfNotExists(dataSource);
+
       engine.setConfigProperties(dbProps());
       crawlerConfig.setDataStoreEngine(engine);
 
@@ -73,6 +97,20 @@ public class Main {
       spider.clean();
 
       spider.start();
+    }
+  }
+
+  static void createStatsTableIfNotExists(final DataSource datasource) throws SQLException {
+    try (var con = datasource.getConnection();
+        var createTable = con.prepareStatement(CREATE_DOMAIN_STATS_TABLE);
+        var createIndex = con.prepareStatement(CREATE_DOMAIN_STATS_INDEX)) {
+
+      con.setAutoCommit(false);
+      createTable.executeUpdate();
+      createIndex.executeUpdate();
+
+      con.commit();
+      con.setAutoCommit(true);
     }
   }
 
