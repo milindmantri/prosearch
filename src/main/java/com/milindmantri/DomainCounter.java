@@ -19,13 +19,21 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
   private static final String CREATE_TABLE =
       """
-  CREATE TABLE IF NOT EXISTS
-    host_count
-  (
-      host VARCHAR NOT NULL
-    , url  VARCHAR NOT NULL
-  )
-  """;
+      CREATE TABLE IF NOT EXISTS
+        host_count
+      (
+          host VARCHAR NOT NULL
+        , url  VARCHAR NOT NULL
+      )
+      """;
+
+  private static final String CREATE_INDEX =
+      """
+      CREATE INDEX IF NOT EXISTS
+        host_count_index
+      ON
+        host_count (host, url)
+      """;
 
   private static final String PG_UNDEFINED_RELATION_ERR_CODE = "42P01";
 
@@ -95,7 +103,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
           var indexStmt = con.createStatement()) {
 
         createTablePs.executeUpdate();
-        indexStmt.executeUpdate("CREATE INDEX IF NOT EXISTS host_count_index ON host_count (host)");
+        indexStmt.executeUpdate(CREATE_INDEX);
 
       } catch (SQLException e) {
         throw new RuntimeException(e);
