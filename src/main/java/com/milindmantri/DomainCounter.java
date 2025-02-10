@@ -2,6 +2,7 @@ package com.milindmantri;
 
 import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.filter.IReferenceFilter;
+import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
 import java.net.URI;
@@ -13,6 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 
 public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
+
+  private static final GenericURLNormalizer URL_NORMALIZER = new GenericURLNormalizer();
 
   private static final String CREATE_TABLE =
       """
@@ -50,7 +53,8 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
   }
 
   @Override
-  public boolean acceptReference(final String reference) {
+  public boolean acceptReference(final String ref) {
+    final String reference = URL_NORMALIZER.normalizeURL(ref);
     String host = URI.create(reference).getHost();
 
     // TODO: insertIntoDb and local count handling should happen in a txn

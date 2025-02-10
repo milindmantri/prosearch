@@ -153,6 +153,28 @@ class DomainCounterTest {
   }
 
   @Test
+  void insertEntryOnNewLinkWithFragment() throws SQLException {
+    var dc = new DomainCounter(1, datasource);
+
+    final String link = "https://www.php.net/new-link#fragment-data";
+
+    assertTrue(dc.acceptReference(link));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+
+      var rs = ps.executeQuery();
+
+      assertTrue(rs.next());
+      String host = rs.getString(1);
+      String url = rs.getString(2);
+
+      assertEquals("www.php.net", host);
+      assertEquals("https://www.php.net/new-link", url);
+    }
+  }
+
+  @Test
   void insertEntryOnNewLink2() throws SQLException {
     var dc = new DomainCounter(2, datasource);
 
