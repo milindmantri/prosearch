@@ -43,8 +43,6 @@ public class TantivyCommitter extends AbstractCommitter {
       throw new IllegalArgumentException("upsertRequest must not be null.");
     }
 
-    // TODO: Add stats for indexed pages per domain
-
     try {
       final URI uri = URI.create(upsertRequest.getReference());
       boolean deleteResult = client.delete(uri);

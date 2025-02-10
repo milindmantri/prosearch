@@ -43,9 +43,10 @@ public class Main {
       """;
 
   public static void main(String[] args) throws SQLException {
+
     // Why even allow for new HttpCollector(), when setting id is required. It will anyway error.
     HttpCollectorConfig config = new HttpCollectorConfig();
-    config.setId("test");
+    config.setId(System.getProperty("collector-id", "ps"));
 
     // TODO: crawler automatically closes after finish. We want to recrawl routinely.
 
@@ -60,7 +61,7 @@ public class Main {
 
     // TODO: Set threads for crawler
 
-    crawlerConfig.setId("test-crawler");
+    crawlerConfig.setId(System.getProperty("crawler-id", "crwlr"));
 
     // TODO: What about the case for redirected domains, like openjdk.java.net
     var urlCrawlScope = new URLCrawlScopeStrategy();
