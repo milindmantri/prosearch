@@ -19,8 +19,8 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
   CREATE TABLE IF NOT EXISTS
     host_count
   (
-      host VARCHAR
-    , url VARCHAR
+      host VARCHAR NOT NULL
+    , url  VARCHAR NOT NULL
   )
   """;
 
