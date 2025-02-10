@@ -22,16 +22,6 @@ class DomainCounterTest {
   private static final HikariDataSource datasource =
       new HikariDataSource(new HikariConfig(dbProps()));
 
-  private static final String CREATE_TABLE =
-      """
-    CREATE TABLE IF NOT EXISTS
-      host_count
-    (
-        host VARCHAR
-      , url VARCHAR
-    )
-    """;
-
   private static final String DROP_TABLE =
       """
     DROP TABLE IF EXISTS host_count;
@@ -47,8 +37,10 @@ class DomainCounterTest {
   @BeforeEach
   void createTable() throws SQLException {
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement(CREATE_TABLE)) {
+        var ps = con.prepareStatement(DomainCounter.CREATE_TABLE);
+        var indexPs = con.prepareStatement(DomainCounter.CREATE_INDEX)) {
       ps.executeUpdate();
+      indexPs.executeUpdate();
     }
   }
 
@@ -197,6 +189,28 @@ class DomainCounterTest {
       assertEquals("www.php.net", rs.getString(1));
       assertEquals(link2, rs.getString(2));
 
+      assertFalse(rs.next());
+    }
+  }
+
+  @Test
+  void insertEntryOnNewLink2WithFragment() throws SQLException {
+    var dc = new DomainCounter(2, datasource);
+
+    final String link1 = "https://www.php.net/new-link";
+    final String link2 = "https://www.php.net/new-link#frag-on-same-link";
+
+    assertTrue(dc.acceptReference(link1));
+    assertFalse(dc.acceptReference(link2));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+
+      var rs = ps.executeQuery();
+
+      assertTrue(rs.next());
+      assertEquals("www.php.net", rs.getString(1));
+      assertEquals(link1, rs.getString(2));
       assertFalse(rs.next());
     }
   }

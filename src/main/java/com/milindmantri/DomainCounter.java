@@ -17,7 +17,8 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
   private static final GenericURLNormalizer URL_NORMALIZER = new GenericURLNormalizer();
 
-  private static final String CREATE_TABLE =
+  // Visible to tests
+  static final String CREATE_TABLE =
       """
       CREATE TABLE IF NOT EXISTS
         host_count
@@ -27,15 +28,16 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       )
       """;
 
-  private static final String CREATE_INDEX =
+  static final String CREATE_INDEX =
       """
-      CREATE INDEX IF NOT EXISTS
+      CREATE UNIQUE INDEX IF NOT EXISTS
         host_count_index
       ON
         host_count (host, url)
       """;
 
   private static final String PG_UNDEFINED_RELATION_ERR_CODE = "42P01";
+  private static final String PG_UNIQUE_VIOLATION_ERR_CODE = "23505";
 
   private final int limit;
 
@@ -73,15 +75,16 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       if (i.get() == limit) {
         return false;
       } else {
-        insertIntoDb(host, reference);
-        return i.incrementAndGet() <= limit;
+        return insertIntoDb(host, reference) && i.incrementAndGet() <= limit;
       }
 
     } else {
-      insertIntoDb(host, reference);
-
-      count.put(host, new AtomicInteger(1));
-      return true;
+      if (insertIntoDb(host, reference)) {
+        count.put(host, new AtomicInteger(1));
+        return true;
+      } else {
+        throw new IllegalStateException("Inserting host in DB failed, without being initialized.");
+      }
     }
   }
 
@@ -155,7 +158,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
     }
   }
 
-  private void insertIntoDb(final String host, final String reference) {
+  private boolean insertIntoDb(final String host, final String reference) {
     try (var con = this.dataSource.getConnection();
         var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
 
@@ -163,8 +166,13 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       ps.setString(2, reference);
 
       ps.executeUpdate();
+      return true;
     } catch (SQLException e) {
-      throw new RuntimeException(e);
+      if (PG_UNIQUE_VIOLATION_ERR_CODE.equals(e.getSQLState())) {
+        return false;
+      } else {
+        throw new RuntimeException(e);
+      }
     }
   }
 }

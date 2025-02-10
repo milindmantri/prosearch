@@ -51,7 +51,6 @@ public class Main {
 
     HttpCrawlerConfig crawlerConfig = new HttpCrawlerConfig();
 
-    // TODO: Prevent duplicate crawls (do using unique index on db table)
     // TODO: Delete orphan URLs and spoiled refs
 
     crawlerConfig.setUrlNormalizer(new GenericURLNormalizer());
