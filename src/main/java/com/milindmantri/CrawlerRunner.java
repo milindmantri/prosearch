@@ -43,7 +43,7 @@ public final class CrawlerRunner implements Runnable {
     // TODO: pass list of all URLs to crawl
     crawlerConfig.setStartURLs("https://www.php.net", "https://elm-lang.org");
 
-    // TODO: Set threads for crawler
+    crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
 
     crawlerConfig.setId(System.getProperty("crawler-id", "crwlr"));
 
