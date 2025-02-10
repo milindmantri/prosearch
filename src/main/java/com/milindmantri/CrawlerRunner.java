@@ -6,11 +6,13 @@ import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
+import com.norconex.collector.http.delay.impl.GenericDelayResolver;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.text.TextMatcher;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 
@@ -44,6 +46,12 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setStartURLs("https://www.php.net", "https://elm-lang.org");
 
     crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
+
+    GenericDelayResolver delayResolver = new GenericDelayResolver();
+    int delayInSeconds = Integer.parseInt(System.getProperty("crawl-download-delay-seconds", "1"));
+
+    delayResolver.setDefaultDelay(Duration.ofSeconds(delayInSeconds).toMillis());
+    crawlerConfig.setDelayResolver(delayResolver);
 
     crawlerConfig.setId(System.getProperty("crawler-id", "crwlr"));
 
