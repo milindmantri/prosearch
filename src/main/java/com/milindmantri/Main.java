@@ -6,6 +6,7 @@ import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
+import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.text.TextMatcher;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -50,6 +51,11 @@ public class Main {
 
     HttpCrawlerConfig crawlerConfig = new HttpCrawlerConfig();
 
+    // TODO: Prevent duplicate crawls (do using unique index on db table)
+    // TODO: Delete orphan URLs and spoiled refs
+
+    crawlerConfig.setUrlNormalizer(new GenericURLNormalizer());
+
     // TODO: pass list of all URLs to crawl
     crawlerConfig.setStartURLs("https://www.php.net", "https://elm-lang.org");
 
@@ -69,6 +75,9 @@ public class Main {
 
     try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine();
         var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()))) {
+
+      // TODO: Remove once testing is complete
+      dropStatsTable(dataSource);
 
       createStatsTableIfNotExists(dataSource);
 
@@ -111,6 +120,12 @@ public class Main {
 
       con.commit();
       con.setAutoCommit(true);
+    }
+  }
+
+  private static void dropStatsTable(final DataSource datasource) throws SQLException {
+    try (var con = datasource.getConnection()) {
+      con.createStatement().executeUpdate("DROP TABLE IF EXISTS domain_stats");
     }
   }
 
