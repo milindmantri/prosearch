@@ -9,6 +9,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public class TantivyClient {
 
@@ -19,6 +20,30 @@ public class TantivyClient {
     // TODO: Add null checks
     this.httpClient = httpClient;
     this.host = host;
+  }
+
+  public static class FailedSearchException extends Exception {
+    public FailedSearchException(final String term) {
+      super("Failed to search for term: %s".formatted(term));
+    }
+  }
+
+  Stream<String> search(final String term)
+      throws IOException, InterruptedException, FailedSearchException {
+
+    HttpResponse<Stream<String>> response =
+        this.httpClient.send(
+            HttpRequest.newBuilder()
+                .GET()
+                .uri(URI.create("%s/api/?q=%s".formatted(this.host.toString(), term)))
+                .build(),
+            HttpResponse.BodyHandlers.ofLines());
+
+    if (response.statusCode() == HttpURLConnection.HTTP_OK) {
+      return response.body();
+    } else {
+      throw new FailedSearchException(term);
+    }
   }
 
   boolean delete(final URI uri) throws IOException, InterruptedException {

@@ -15,6 +15,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
@@ -86,19 +88,69 @@ class TantivyClientTest {
   }
 
   @Test
+  void searchNonEncoded() {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    assertThrows(IllegalArgumentException.class, () -> tc.search("search term"));
+  }
+
+  @Test
+  void searchEncoded()
+      throws IOException, InterruptedException, TantivyClient.FailedSearchException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<Stream<String>> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn(Stream.of("content"));
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<Stream<String>>send(any(), any())).thenReturn(response);
+
+    assertEquals("content", tc.search("hello%20world").collect(Collectors.joining()));
+
+    Mockito.verify(httpClient, times(1))
+        .send(
+            eq(
+                HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
+                    .GET()
+                    .build()),
+            any(HttpResponse.BodyHandler.class));
+  }
+
+  @Test
+  void searchFailed() throws IOException, InterruptedException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<Stream<String>> response = Mockito.mock(HttpResponse.class);
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_BAD_REQUEST);
+    when(response.body()).thenReturn(Stream.of("error"));
+
+    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+        .thenReturn(response);
+
+    assertThrows(TantivyClient.FailedSearchException.class, () -> tc.search("failedsearch"));
+  }
+
+  @Test
   void deleteResponseValid() throws IOException, InterruptedException {
     HttpClient httpClient = Mockito.mock(HttpClient.class);
     URI host = URI.create("http://localhost");
     var tc = new TantivyClient(httpClient, host);
 
-    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
-    when(response.statusCode()).thenReturn(200);
-    when(response.body()).thenReturn("true");
+    HttpResponse<Stream<String>> response = Mockito.mock(HttpResponse.class);
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_BAD_REQUEST);
+    when(response.body()).thenReturn(Stream.of("error"));
 
     when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
         .thenReturn(response);
 
-    assertTrue(tc.delete(URI.create("http://delete-this-link.com")));
+    assertThrows(TantivyClient.FailedSearchException.class, () -> tc.search("failedsearch"));
   }
 
   @Test
