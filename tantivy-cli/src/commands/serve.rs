@@ -30,7 +30,7 @@ use std::fmt::{self, Debug};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tantivy::collector::{Count, TopDocs};
+use tantivy::collector::{TopDocs};
 use tantivy::query::QueryParser;
 use tantivy::schema::NamedFieldDocument;
 use tantivy::schema::Schema;
@@ -60,7 +60,6 @@ pub fn run_serve_cli(matches: &ArgMatches) -> Result<(), String> {
 #[derive(Serialize)]
 struct Serp {
     q: String,
-    num_hits: usize,
     hits: Vec<Hit>,
     timings: TimerTree,
 }
@@ -129,11 +128,11 @@ impl IndexServer {
 
         let searcher = self.reader.searcher();
         let mut timer_tree = TimerTree::default();
-        let (top_docs, num_hits) = {
+        let top_docs = {
             let _search_timer = timer_tree.open("search");
             searcher.search(
                 &query,
-                &(TopDocs::with_limit(num_hits).and_offset(offset), Count),
+                &(TopDocs::with_limit(num_hits).and_offset(offset)),
             )?
         };
 
@@ -155,7 +154,6 @@ impl IndexServer {
         };
         Ok(Serp {
             q,
-            num_hits,
             hits,
             timings: timer_tree,
         })
