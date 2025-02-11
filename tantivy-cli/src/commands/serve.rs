@@ -111,9 +111,11 @@ impl IndexServer {
     }
 
     fn create_hit<D: Document>(&self, score: Score, doc: D, doc_address: DocAddress, snippet: String) -> Hit {
+        let mut named_doc = doc.to_named_doc(&self.schema);
+        named_doc.0.remove("body");
         Hit {
             score,
-            doc: doc.to_named_doc(&self.schema),
+            doc: named_doc,
             id: doc_address.doc_id,
             snip: snippet
         }
@@ -147,7 +149,6 @@ impl IndexServer {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
 
                     let snippet = snippet_generator.snippet_from_doc(&doc).to_html();
-
                     self.create_hit(*score, doc, *doc_address, snippet)
                 })
                 .collect()
