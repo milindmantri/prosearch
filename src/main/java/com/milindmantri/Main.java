@@ -1,7 +1,15 @@
 package com.milindmantri;
 
+import com.sun.net.httpserver.HttpServer;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +43,7 @@ public class Main {
       """;
 
   public static void main(String[] args)
-      throws SQLException, ExecutionException, InterruptedException {
+      throws SQLException, ExecutionException, InterruptedException, IOException {
 
     try (var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()));
         ScheduledExecutorService crawlerScheduler = Executors.newSingleThreadScheduledExecutor()) {
@@ -53,8 +61,56 @@ public class Main {
 
       sf.get();
 
-      // TODO: add http server
+      // TODO: same client can be passed to crawler
+      var client =
+          new TantivyClient(
+              HttpClient.newBuilder()
+                  .followRedirects(HttpClient.Redirect.NORMAL)
+                  .version(HttpClient.Version.HTTP_1_1)
+                  .build(),
+              URI.create(System.getProperty("tantivy-server", "http://localhost:3000")));
+
+      int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
+
+      HttpServer httpServer = httpServer(httpPort, client);
+
+      httpServer.start();
     }
+  }
+
+  static HttpServer httpServer(final int port, final TantivyClient tantivyClient)
+      throws IOException {
+    HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
+    httpServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+
+    httpServer.createContext(
+        "/search/",
+        exchange -> {
+          final URI uri = exchange.getRequestURI();
+          final String searchTerm = uri.getRawPath().substring(8);
+
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
+
+          try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
+              var writer = new BufferedWriter(outWriter)) {
+            tantivyClient
+                .search(searchTerm)
+                .forEach(
+                    str -> {
+                      try {
+                        writer.write(str);
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                    });
+          } catch (InterruptedException | TantivyClient.FailedSearchException e) {
+            throw new RuntimeException(e);
+          } finally {
+            exchange.close();
+          }
+        });
+    return httpServer;
   }
 
   static void createStatsTableIfNotExists(final DataSource datasource) throws SQLException {
