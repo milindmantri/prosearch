@@ -10,6 +10,7 @@ import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +19,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 
 public class Main {
 
@@ -41,6 +45,8 @@ public class Main {
         , url
       )
       """;
+
+  private static final String QUERY_PARAM = "q";
 
   public static void main(String[] args)
       throws SQLException, ExecutionException, InterruptedException, IOException {
@@ -87,30 +93,54 @@ public class Main {
         "/search/",
         exchange -> {
           final URI uri = exchange.getRequestURI();
-          final String searchTerm = uri.getRawPath().substring(8);
+          final List<NameValuePair> nvp =
+              URLEncodedUtils.parse(uri.getRawQuery(), StandardCharsets.UTF_8);
+
+          final var maybeSearchTerm =
+              nvp.stream()
+                  .filter(n -> QUERY_PARAM.equals(n.getName()))
+                  .map(NameValuePair::getValue)
+                  .findFirst();
 
           exchange.getResponseHeaders().add("Content-Type", "application/json");
-          exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
 
-          try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
-              var writer = new BufferedWriter(outWriter)) {
-            tantivyClient
-                .search(searchTerm)
-                .forEach(
-                    str -> {
-                      try {
-                        writer.write(str);
-                      } catch (IOException e) {
-                        throw new RuntimeException(e);
-                      }
-                    });
-          } catch (InterruptedException | TantivyClient.FailedSearchException e) {
-            throw new RuntimeException(e);
+          try {
+            if (maybeSearchTerm.isPresent()) {
+              final String term = maybeSearchTerm.get();
+
+              Stream<String> searchResult = tantivyClient.search(term);
+
+              // need to send response headers before calling getResponseBody (API limitation)
+              exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
+
+              try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
+                  var writer = new BufferedWriter(outWriter)) {
+
+                searchResult.forEach(str -> write(writer, str));
+              }
+
+            } else {
+              // empty search page
+            }
+
+          } catch (RuntimeException
+              | InterruptedException
+              | TantivyClient.FailedSearchException e) {
+            exchange.sendResponseHeaders(HttpURLConnection.HTTP_INTERNAL_ERROR, 0);
+
           } finally {
             exchange.close();
           }
         });
     return httpServer;
+  }
+
+  private static void write(final BufferedWriter writer, final String str) {
+    try {
+      writer.write(str);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   static void createStatsTableIfNotExists(final DataSource datasource) throws SQLException {

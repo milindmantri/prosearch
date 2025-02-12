@@ -55,13 +55,38 @@ class MainTest {
                 .GET()
                 .uri(
                     URI.create(
-                        "http://localhost:%s/search/hello"
+                        "http://localhost:%s/search/?q=hello"
                             .formatted(httpServer.getAddress().getPort())))
                 .build(),
             HttpResponse.BodyHandlers.ofString());
 
     assertEquals(HttpURLConnection.HTTP_OK, res.statusCode());
     assertEquals("content", res.body());
+
+    httpServer.stop(0);
+  }
+
+  @Test
+  void serverError() throws IOException, InterruptedException, TantivyClient.FailedSearchException {
+    TantivyClient tantivy = Mockito.mock(TantivyClient.class);
+    Mockito.when(tantivy.search("hello"))
+        .thenThrow(new TantivyClient.FailedSearchException("search-err"));
+
+    HttpServer httpServer = Main.httpServer(0, tantivy);
+    httpServer.start();
+    HttpClient client = HttpClient.newHttpClient();
+    HttpResponse<String> res =
+        client.send(
+            HttpRequest.newBuilder()
+                .GET()
+                .uri(
+                    URI.create(
+                        "http://localhost:%s/search/?q=hello"
+                            .formatted(httpServer.getAddress().getPort())))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+    assertEquals(HttpURLConnection.HTTP_INTERNAL_ERROR, res.statusCode());
 
     httpServer.stop(0);
   }
