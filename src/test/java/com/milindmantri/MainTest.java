@@ -27,8 +27,6 @@ class MainTest {
   private static final HikariDataSource datasource =
       new HikariDataSource(new HikariConfig(dbProps()));
 
-  private static int port;
-
   @AfterAll
   static void closeDataSource() {
     datasource.close();
