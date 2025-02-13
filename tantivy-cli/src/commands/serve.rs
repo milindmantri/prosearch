@@ -41,7 +41,6 @@ use tantivy::Index;
 use tantivy::{IndexReader, IndexWriter};
 use tantivy::TantivyDocument;
 use tantivy::TantivyError::InvalidArgument;
-use tantivy::{DocAddress, Score};
 use tantivy::snippet::{SnippetGenerator};
 use urlencoded::UrlEncodedQuery;
 use bodyparser::Json;
@@ -66,10 +65,8 @@ struct Serp {
 
 #[derive(Serialize)]
 struct Hit {
-    score: Score,
     doc: NamedFieldDocument,
     snip: String,
-    id: u32,
 }
 
 struct IndexServer {
@@ -110,13 +107,11 @@ impl IndexServer {
         })
     }
 
-    fn create_hit<D: Document>(&self, score: Score, doc: D, doc_address: DocAddress, snippet: String) -> Hit {
+    fn create_hit<D: Document>(&self, doc: D, snippet: String) -> Hit {
         let mut named_doc = doc.to_named_doc(&self.schema);
         named_doc.0.remove("body");
         Hit {
-            score,
             doc: named_doc,
-            id: doc_address.doc_id,
             snip: snippet
         }
     }
@@ -141,18 +136,16 @@ impl IndexServer {
         let body = self.schema.get_field("body").unwrap();
         let snippet_generator = SnippetGenerator::create(&searcher, &*query, body)?;
 
-        let hits: Vec<Hit> = {
-            let _fetching_timer = timer_tree.open("fetching docs");
+        let hits: Vec<Hit> =
             top_docs
                 .iter()
                 .map(|(score, doc_address)| {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
 
                     let snippet = snippet_generator.snippet_from_doc(&doc).to_html();
-                    self.create_hit(*score, doc, *doc_address, snippet)
+                    self.create_hit(doc, snippet)
                 })
-                .collect()
-        };
+                .collect();
         Ok(Serp {
             q,
             hits,
