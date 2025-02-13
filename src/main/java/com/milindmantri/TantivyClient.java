@@ -1,6 +1,7 @@
 package com.milindmantri;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -8,6 +9,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -28,19 +31,67 @@ public class TantivyClient {
     }
   }
 
-  Stream<String> search(final String term)
+  public record SearchResult(String title, String snippet, String url) {}
+
+  public record SearchResultWithLatency(Optional<Stream<SearchResult>> results, Duration latency) {
+
+    // soft equals, does not compare streams
+    public boolean equals(Object that) {
+      if (this == that) return true;
+
+      return (that instanceof SearchResultWithLatency s)
+          && Objects.equals(this.latency, s.latency)
+          && this.results.isPresent() == s.results.isPresent();
+    }
+  }
+
+  // TODO: This could ideally transform JSON response on the fly into a stream of SearchResult
+  // which could then be consumed
+  SearchResultWithLatency search(final String term)
       throws IOException, InterruptedException, FailedSearchException {
 
-    HttpResponse<Stream<String>> response =
+    HttpResponse<String> response =
         this.httpClient.send(
             HttpRequest.newBuilder()
                 .GET()
                 .uri(URI.create("%s/api/?q=%s".formatted(this.host.toString(), term)))
                 .build(),
-            HttpResponse.BodyHandlers.ofLines());
+            HttpResponse.BodyHandlers.ofString());
 
     if (response.statusCode() == HttpURLConnection.HTTP_OK) {
-      return response.body();
+      JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+
+      Duration latency =
+          Duration.ofNanos(
+              json.getAsJsonObject("timings")
+                      .getAsJsonArray("timings")
+                      .get(0)
+                      .getAsJsonObject()
+                      .get("duration")
+                      .getAsLong()
+                  * 1000L);
+
+      var hits = json.getAsJsonArray("hits");
+      if (!hits.isEmpty()) {
+        Stream.Builder<SearchResult> results = Stream.builder();
+
+        hits.forEach(
+            hit -> {
+              var obj = hit.getAsJsonObject();
+              var doc = obj.getAsJsonObject("doc");
+              results.accept(
+                  new SearchResult(
+                      doc.getAsJsonArray("title").get(0).getAsString(),
+                      obj.getAsJsonPrimitive("snip").getAsString(),
+                      doc.getAsJsonArray("url").get(0).getAsString()));
+            });
+
+        return new SearchResultWithLatency(Optional.of(results.build()), latency);
+
+      } else {
+        return new SearchResultWithLatency(Optional.empty(), latency);
+      }
+
     } else {
       throw new FailedSearchException(term);
     }

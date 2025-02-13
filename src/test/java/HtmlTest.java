@@ -1,5 +1,6 @@
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.milindmantri.Html;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -13,7 +14,7 @@ class HtmlTest {
     ordered.putFirst("charset", "UTF-8");
     ordered.putLast("author", "Person");
 
-    Html tag = new Html.Void("meta", ordered);
+    Html tag = new Html.VoidTag("meta", ordered);
 
     assertEquals(
         """
@@ -27,7 +28,7 @@ class HtmlTest {
 
   @Test
   void brTag() {
-    Html br = new Html.Void("br");
+    Html br = new Html.VoidTag("br");
     assertEquals("<br\n/>", br.toString());
   }
 
@@ -53,7 +54,7 @@ class HtmlTest {
   @Test
   void divBr() {
     Html div =
-        new Html.Tag("div", Map.of("id", "div-id"), Stream.of(new Html.Void("br")));
+        new Html.Tag("div", Map.of("id", "div-id"), Stream.of(new Html.VoidTag("br")));
     assertEquals(
         """
   <div
@@ -73,7 +74,7 @@ class HtmlTest {
             "div",
             Map.of("id", "div-id"),
             Stream.of(
-                new Html.Void("br"), new Html.Tag("div", Map.of("id", "inner-div"))));
+                new Html.VoidTag("br"), new Html.Tag("div", Map.of("id", "inner-div"))));
     assertEquals(
         """
       <div

@@ -1,11 +1,13 @@
 package com.milindmantri;
 
+import com.milindmantri.pages.SearchPage;
 import com.sun.net.httpserver.HttpServer;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -19,7 +21,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -46,7 +47,7 @@ public class Main {
       )
       """;
 
-  private static final String QUERY_PARAM = "q";
+  public static final String QUERY_PARAM = "q";
 
   public static void main(String[] args)
       throws SQLException, ExecutionException, InterruptedException, IOException {
@@ -100,15 +101,18 @@ public class Main {
               nvp.stream()
                   .filter(n -> QUERY_PARAM.equals(n.getName()))
                   .map(NameValuePair::getValue)
+                  .filter(str -> !str.isBlank())
                   .findFirst();
 
-          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.getResponseHeaders().add("Content-Type", "text/html");
 
           try {
             if (maybeSearchTerm.isPresent()) {
               final String term = maybeSearchTerm.get();
 
-              Stream<String> searchResult = tantivyClient.search(term);
+              var searchResult = tantivyClient.search(term);
+
+              var sp = new SearchPage(term, searchResult);
 
               // need to send response headers before calling getResponseBody (API limitation)
               exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
@@ -116,18 +120,27 @@ public class Main {
               try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
                   var writer = new BufferedWriter(outWriter)) {
 
-                searchResult.forEach(str -> write(writer, str));
+                sp.html().map(Html::toString).forEach(str -> Main.write(writer, str));
               }
 
             } else {
               // empty search page
+              exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
+              try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
+                  var writer = new BufferedWriter(outWriter)) {
+
+                new SearchPage().html().map(Html::toString).forEach(str -> Main.write(writer, str));
+              }
             }
 
           } catch (RuntimeException
               | InterruptedException
               | TantivyClient.FailedSearchException e) {
             exchange.sendResponseHeaders(HttpURLConnection.HTTP_INTERNAL_ERROR, 0);
-
+            try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
+                var writer = new BufferedWriter(outWriter)) {
+              writer.write(e.toString());
+            }
           } finally {
             exchange.close();
           }
@@ -135,7 +148,7 @@ public class Main {
     return httpServer;
   }
 
-  private static void write(final BufferedWriter writer, final String str) {
+  private static void write(final Writer writer, final String str) {
     try {
       writer.write(str);
     } catch (IOException e) {

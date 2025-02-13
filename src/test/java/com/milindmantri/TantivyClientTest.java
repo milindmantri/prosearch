@@ -14,14 +14,50 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 
 class TantivyClientTest {
+
+  private static final String SAMPLE_JSON_RESPONSE =
+      """
+      {
+        "q": "abc",
+        "hits": [{
+          "doc": {
+           "title": [
+             "Example Title"
+           ],
+           "url": [
+             "https://example.com"
+           ]
+         },
+         "snip": "Snippet"
+       }],
+        "timings": {
+          "timings": [
+            {
+              "name": "search",
+              "duration": 638,
+              "depth": 0
+            }
+          ]
+        }
+      }
+      """;
+
+  private static final TantivyClient.SearchResultWithLatency SAMPLE_RESPONSE_OBJ =
+      new TantivyClient.SearchResultWithLatency(
+          Optional.of(
+              Stream.of(
+                  new TantivyClient.SearchResult(
+                      "Example Title", "Snippet", "https://example.com"))),
+          Duration.ofNanos(638 * 1000));
 
   // Since HttpRequest equals does not compare POST body, using eq() arg matcher wouldn't compare
   // the JSON bodies of the requests. Using a little reflection in tests enables easy comparison
@@ -103,13 +139,15 @@ class TantivyClientTest {
     URI host = URI.create("http://localhost");
     var tc = new TantivyClient(httpClient, host);
 
-    HttpResponse<Stream<String>> response = Mockito.mock(HttpResponse.class);
-    when(response.body()).thenReturn(Stream.of("content"));
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn(SAMPLE_JSON_RESPONSE);
     when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
 
-    Mockito.when(httpClient.<Stream<String>>send(any(), any())).thenReturn(response);
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
 
-    assertEquals("content", tc.search("hello%20world").collect(Collectors.joining()));
+    var res = tc.search("hello%20world");
+    assertEquals(SAMPLE_RESPONSE_OBJ, res);
+    assertEquals(res.results().get().toList(), SAMPLE_RESPONSE_OBJ.results().get().toList());
 
     Mockito.verify(httpClient, times(1))
         .send(
