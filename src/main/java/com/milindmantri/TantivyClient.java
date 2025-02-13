@@ -137,6 +137,33 @@ public class TantivyClient {
   }
 
   /** When successful, returned long value is the length of indexed document, otherwise empty */
+  Optional<Long> indexAndLength(
+      final URI uri, final String title, final String body, final String description)
+      throws IOException, InterruptedException {
+
+    var obj = new JsonObject();
+    obj.addProperty("url", uri.toString());
+    obj.addProperty("title", title);
+    obj.addProperty("body", body);
+    obj.addProperty("desc", description);
+
+    HttpResponse<String> response =
+        this.httpClient.send(
+            HttpRequest.newBuilder()
+                .POST(HttpRequest.BodyPublishers.ofString(obj.toString()))
+                .header("Content-Type", "application/json")
+                .uri(URI.create("%s/index/".formatted(this.host.toString())))
+                .build(),
+            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+    if (response.statusCode() == HttpURLConnection.HTTP_OK) {
+      return Optional.of(Long.parseLong(response.body()));
+    } else {
+      return Optional.empty();
+    }
+  }
+
+  /** When successful, returned long value is the length of indexed document, otherwise empty */
   Optional<Long> indexAndLength(final URI uri, final String body)
       throws IOException, InterruptedException {
     return this.indexAndLength(uri, uri.toString(), body);

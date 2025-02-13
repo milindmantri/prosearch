@@ -61,7 +61,7 @@ class TantivyClientTest {
 
   // Since HttpRequest equals does not compare POST body, using eq() arg matcher wouldn't compare
   // the JSON bodies of the requests. Using a little reflection in tests enables easy comparison
-  class HttpRequestPostBody implements ArgumentMatcher<HttpRequest> {
+  static class HttpRequestPostBody implements ArgumentMatcher<HttpRequest> {
 
     private final String content;
     private final HttpRequest httpRequest;
@@ -238,6 +238,45 @@ class TantivyClientTest {
                 URI.create("http://index-this-link.com"),
                 "My \"Quoted\" Title",
                 "\"Quoted\" content to index")
+            .isPresent());
+
+    Mockito.verify(httpClient, times(1))
+        .send(argThat(new HttpRequestPostBody(httpRequest)), any(HttpResponse.BodyHandler.class));
+  }
+
+  @Test
+  void indexWithTitleWithDescription() throws IOException, InterruptedException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    var httpRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create("http://localhost/index/"))
+            .header("Content-Type", "application/json")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    """
+            {"url":"http://index-this-link.com"\
+            ,"title":"My \\"Quoted\\" Title"\
+            ,"body":"\\"Quoted\\" content to index"\
+            ,"desc":"Meta description"\
+            }\
+            """))
+            .build();
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn("7");
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
+
+    assertTrue(
+        tc.indexAndLength(
+                URI.create("http://index-this-link.com"),
+                "My \"Quoted\" Title",
+                "\"Quoted\" content to index",
+                "Meta description")
             .isPresent());
 
     Mockito.verify(httpClient, times(1))
