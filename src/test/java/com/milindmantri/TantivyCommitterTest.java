@@ -60,6 +60,40 @@ class TantivyCommitterTest {
   }
 
   @Test
+  void doUpsertDesc() throws CommitterException, IOException, InterruptedException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of(7L));
+
+    try (var tc = new TantivyCommitter(client, datasource)) {
+
+      var props =
+          new Properties(
+              Map.of(
+                  "title",
+                  List.of("Example Title"),
+                  "description",
+                  List.of("Example description")));
+
+      assertDoesNotThrow(
+          () ->
+              tc.doUpsert(
+                  new UpsertRequest(
+                      "http://example.com",
+                      props,
+                      new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
+
+      InOrder inOrder = inOrder(client);
+      inOrder.verify(client, times(1)).delete(URI.create("http://example.com"));
+      inOrder
+          .verify(client, times(1))
+          .indexAndLength(
+              URI.create("http://example.com"), "Example Title", "content", "Example description");
+    }
+  }
+
+  @Test
   void doUpsertDeleteFails() throws CommitterException, IOException, InterruptedException {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(false);
@@ -123,6 +157,61 @@ class TantivyCommitterTest {
       InOrder inOrder = inOrder(client);
       inOrder.verify(client, times(1)).delete(URI.create("http://example.com"));
       inOrder.verify(client, times(1)).indexAndLength(URI.create("http://example.com"), "content");
+    }
+  }
+
+  @Test
+  void upsertEmptyTitleEmptyDescription()
+      throws CommitterException, IOException, InterruptedException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+    Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any())).thenReturn(Optional.of(7L));
+
+    try (var tc = new TantivyCommitter(client, datasource)) {
+      var emptyProps = new Properties();
+
+      assertDoesNotThrow(
+          () ->
+              tc.doUpsert(
+                  new UpsertRequest(
+                      "http://example.com",
+                      emptyProps,
+                      new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
+
+      InOrder inOrder = inOrder(client);
+      inOrder.verify(client, times(1)).delete(URI.create("http://example.com"));
+      inOrder.verify(client, times(1)).indexAndLength(URI.create("http://example.com"), "content");
+    }
+  }
+
+  @Test
+  void upsertEmptyTitleWithDescription()
+      throws CommitterException, IOException, InterruptedException {
+    var client = Mockito.mock(TantivyClient.class);
+    Mockito.when(client.delete(Mockito.any())).thenReturn(true);
+    Mockito.when(
+            client.indexAndLengthNoTitleWithDescription(
+                Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenReturn(Optional.of(7L));
+
+    try (var tc = new TantivyCommitter(client, datasource)) {
+      var props = new Properties();
+      props.add("description", "meta description");
+
+      assertDoesNotThrow(
+          () ->
+              tc.doUpsert(
+                  new UpsertRequest(
+                      "http://example.com",
+                      props,
+                      new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
+
+      InOrder inOrder = inOrder(client);
+      inOrder.verify(client, times(1)).delete(URI.create("http://example.com"));
+      inOrder
+          .verify(client, times(1))
+          .indexAndLengthNoTitleWithDescription(
+              URI.create("http://example.com"), "content", "meta description");
     }
   }
 

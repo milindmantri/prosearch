@@ -47,13 +47,38 @@ public class TantivyCommitter extends AbstractCommitter {
       final URI uri = URI.create(upsertRequest.getReference());
       boolean deleteResult = client.delete(uri);
 
-      Optional<Long> maybeIndexedBytesLength =
-          upsertRequest.getMetadata().containsKey("title")
-              ? client.indexAndLength(
+      Optional<Long> maybeIndexedBytesLength;
+
+      if (upsertRequest.getMetadata().containsKey("title")) {
+        if (upsertRequest.getMetadata().containsKey("description")) {
+          maybeIndexedBytesLength =
+              client.indexAndLength(
                   uri,
                   upsertRequest.getMetadata().getString("title"),
-                  inputStreamReader(upsertRequest.getContent()))
-              : client.indexAndLength(uri, inputStreamReader(upsertRequest.getContent()));
+                  inputStreamReader(upsertRequest.getContent()),
+                  upsertRequest.getMetadata().getString("description"));
+        } else {
+          maybeIndexedBytesLength =
+              client.indexAndLength(
+                  uri,
+                  upsertRequest.getMetadata().getString("title"),
+                  inputStreamReader(upsertRequest.getContent()));
+        }
+
+      } else {
+
+        if (upsertRequest.getMetadata().containsKey("description")) {
+          maybeIndexedBytesLength =
+              client.indexAndLengthNoTitleWithDescription(
+                  uri,
+                  inputStreamReader(upsertRequest.getContent()),
+                  upsertRequest.getMetadata().getString("description"));
+        } else {
+
+          maybeIndexedBytesLength =
+              client.indexAndLength(uri, inputStreamReader(upsertRequest.getContent()));
+        }
+      }
 
       if (deleteResult && maybeIndexedBytesLength.isPresent()) {
         deleteFromDomainStats(uri);

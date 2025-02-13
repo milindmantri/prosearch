@@ -168,4 +168,11 @@ public class TantivyClient {
       throws IOException, InterruptedException {
     return this.indexAndLength(uri, uri.toString(), body);
   }
+
+  /** When successful, returned long value is the length of indexed document, otherwise empty */
+  Optional<Long> indexAndLengthNoTitleWithDescription(
+      final URI uri, final String body, final String description)
+      throws IOException, InterruptedException {
+    return this.indexAndLength(uri, uri.toString(), body, description);
+  }
 }
