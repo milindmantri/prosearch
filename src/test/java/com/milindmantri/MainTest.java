@@ -12,6 +12,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.SQLException;
+import java.time.Duration;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
@@ -27,6 +29,14 @@ class MainTest {
   private static final HikariDataSource datasource =
       new HikariDataSource(new HikariConfig(dbProps()));
 
+  private static final TantivyClient.SearchResultWithLatency SAMPLE_RESPONSE_OBJ =
+      new TantivyClient.SearchResultWithLatency(
+          Optional.of(
+              Stream.of(
+                  new TantivyClient.SearchResult(
+                      "Example Title", "Snippet", "https://example.com"))),
+          Duration.ofNanos(638 * 1000));
+
   @AfterAll
   static void closeDataSource() {
     datasource.close();
@@ -40,31 +50,30 @@ class MainTest {
       ps.executeUpdate();
     }
   }
-//
-//  @Test
-//  void server() throws IOException, InterruptedException, TantivyClient.FailedSearchException {
-//    TantivyClient tantivy = Mockito.mock(TantivyClient.class);
-//    Mockito.when(tantivy.search("hello")).thenReturn(Stream.of("content"));
-//
-//    HttpServer httpServer = Main.httpServer(0, tantivy);
-//    httpServer.start();
-//    HttpClient client = HttpClient.newHttpClient();
-//    HttpResponse<String> res =
-//        client.send(
-//            HttpRequest.newBuilder()
-//                .GET()
-//                .uri(
-//                    URI.create(
-//                        "http://localhost:%s/search/?q=hello"
-//                            .formatted(httpServer.getAddress().getPort())))
-//                .build(),
-//            HttpResponse.BodyHandlers.ofString());
-//
-//    assertEquals(HttpURLConnection.HTTP_OK, res.statusCode());
-//    assertEquals("content", res.body());
-//
-//    httpServer.stop(0);
-//  }
+
+  @Test
+  void server() throws IOException, InterruptedException, TantivyClient.FailedSearchException {
+    TantivyClient tantivy = Mockito.mock(TantivyClient.class);
+    Mockito.when(tantivy.search("hello")).thenReturn(SAMPLE_RESPONSE_OBJ);
+
+    HttpServer httpServer = Main.httpServer(0, tantivy);
+    httpServer.start();
+    HttpClient client = HttpClient.newHttpClient();
+    HttpResponse<String> res =
+        client.send(
+            HttpRequest.newBuilder()
+                .GET()
+                .uri(
+                    URI.create(
+                        "http://localhost:%s/search/?q=hello"
+                            .formatted(httpServer.getAddress().getPort())))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+
+    assertEquals(HttpURLConnection.HTTP_OK, res.statusCode());
+
+    httpServer.stop(0);
+  }
 
   @Test
   void serverError() throws IOException, InterruptedException, TantivyClient.FailedSearchException {
