@@ -66,17 +66,17 @@ public class Main {
 
       int delayBetweenRuns =
           Integer.parseInt(System.getProperty("delay-hours-between-crawls", "4"));
-      crawlerScheduler.scheduleWithFixedDelay(
-          new CrawlerRunner(dataSource), 0, delayBetweenRuns, TimeUnit.HOURS);
 
-      // TODO: same client can be passed to crawler
-      var client =
+      final TantivyClient client =
           new TantivyClient(
               HttpClient.newBuilder()
                   .followRedirects(HttpClient.Redirect.NORMAL)
                   .version(HttpClient.Version.HTTP_1_1)
                   .build(),
               URI.create(System.getProperty("tantivy-server", "http://localhost:3000")));
+
+      crawlerScheduler.scheduleWithFixedDelay(
+          new CrawlerRunner(dataSource, client), 0, delayBetweenRuns, TimeUnit.HOURS);
 
       int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
 

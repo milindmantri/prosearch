@@ -9,8 +9,6 @@ import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.collector.http.delay.impl.GenericDelayResolver;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.text.TextMatcher;
-import java.net.URI;
-import java.net.http.HttpClient;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.stream.Stream;
@@ -21,12 +19,18 @@ public final class CrawlerRunner implements Runnable {
   private static final int PER_HOST_CRAWLING_LIMIT = 10_000;
 
   private final DataSource datasource;
+  private final TantivyClient client;
 
-  public CrawlerRunner(final DataSource datasource) {
+  public CrawlerRunner(final DataSource datasource, final TantivyClient client) {
     if (datasource == null) {
       throw new IllegalArgumentException("datasource must not be null.");
     }
 
+    if (client == null) {
+      throw new IllegalArgumentException("client must not be null.");
+    }
+
+    this.client = client;
     this.datasource = datasource;
   }
 
@@ -74,15 +78,7 @@ public final class CrawlerRunner implements Runnable {
       crawlerConfig.setEventListeners(domainCounter);
       crawlerConfig.setReferenceFilters(domainCounter);
 
-      crawlerConfig.setCommitters(
-          new TantivyCommitter(
-              new TantivyClient(
-                  HttpClient.newBuilder()
-                      .followRedirects(HttpClient.Redirect.NORMAL)
-                      .version(HttpClient.Version.HTTP_1_1)
-                      .build(),
-                  URI.create(System.getProperty("tantivy-server", "http://localhost:3000"))),
-              this.datasource));
+      crawlerConfig.setCommitters(new TantivyCommitter(this.client, this.datasource));
 
       config.setCrawlerConfigs(crawlerConfig);
 
