@@ -45,8 +45,9 @@ public class Main {
     try (var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()));
         ScheduledExecutorService crawlerScheduler = Executors.newSingleThreadScheduledExecutor()) {
 
-      // TODO: Remove once testing is complete
-      dropStatsTable(dataSource);
+      if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
+        dropStatsTable(dataSource);
+      }
 
       createStatsTableIfNotExists(dataSource);
 

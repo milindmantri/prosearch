@@ -84,8 +84,9 @@ public final class CrawlerRunner implements Runnable {
 
       HttpCollector spider = new HttpCollector(config);
 
-      // TODO: Remove once testing is complete
-      spider.clean();
+      if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
+        spider.clean();
+      }
 
       spider.start();
     } catch (SQLException e) {
