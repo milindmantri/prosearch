@@ -158,10 +158,6 @@ public interface Html {
         "input", Map.of("type", "text", "name", name, "value", value, "placeholder", placeholder));
   }
 
-  static Html script(Stream<Inner> js) {
-    return new Tag("script", Stream.of(new Inner(js.map(Inner::toHtml))));
-  }
-
   static Html meta(Map<String, String> attributes) {
     return new Tag("meta", attributes);
   }
