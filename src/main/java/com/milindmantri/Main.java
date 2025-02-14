@@ -11,6 +11,7 @@ import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -19,11 +20,12 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Main {
 
@@ -47,6 +49,8 @@ public class Main {
       )
       """;
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+
   public static final String QUERY_PARAM = "q";
 
   public static void main(String[] args)
@@ -62,11 +66,8 @@ public class Main {
 
       int delayBetweenRuns =
           Integer.parseInt(System.getProperty("delay-hours-between-crawls", "4"));
-      ScheduledFuture<?> sf =
-          crawlerScheduler.scheduleWithFixedDelay(
-              new CrawlerRunner(dataSource), 0, delayBetweenRuns, TimeUnit.HOURS);
-
-      sf.get();
+      crawlerScheduler.scheduleWithFixedDelay(
+          new CrawlerRunner(dataSource), 0, delayBetweenRuns, TimeUnit.HOURS);
 
       // TODO: same client can be passed to crawler
       var client =
@@ -110,7 +111,8 @@ public class Main {
             if (maybeSearchTerm.isPresent()) {
               final String term = maybeSearchTerm.get();
 
-              var searchResult = tantivyClient.search(term);
+              var searchResult =
+                  tantivyClient.search(URLEncoder.encode(term, StandardCharsets.UTF_8));
 
               var sp = new SearchPage(term, searchResult);
 
@@ -133,13 +135,12 @@ public class Main {
               }
             }
 
-          } catch (RuntimeException
-              | InterruptedException
-              | TantivyClient.FailedSearchException e) {
+          } catch (Exception e) {
             exchange.sendResponseHeaders(HttpURLConnection.HTTP_INTERNAL_ERROR, 0);
             try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
                 var writer = new BufferedWriter(outWriter)) {
-              writer.write(e.toString());
+              LOGGER.error("Failed to process request.", e);
+              writer.write("Internal server error. Contact: milind -at- milindmantri -dot- com");
             }
           } finally {
             exchange.close();
