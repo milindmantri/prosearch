@@ -23,19 +23,19 @@ class HtmlTest {
       author="Person"
       />\
       """,
-        tag.toString());
+        tag.toHtml());
   }
 
   @Test
   void brTag() {
     Html br = new Html.VoidTag("br");
-    assertEquals("<br\n/>", br.toString());
+    assertEquals("<br\n/>", br.toHtml());
   }
 
   @Test
   void div() {
     Html div = new Html.Tag("div");
-    assertEquals("<div\n>\n</div>", div.toString());
+    assertEquals("<div\n>\n</div>", div.toHtml());
   }
 
   @Test
@@ -48,7 +48,7 @@ class HtmlTest {
     >
     </div>\
     """,
-        div.toString());
+        div.toHtml());
   }
 
   @Test
@@ -64,7 +64,7 @@ class HtmlTest {
   />
   </div>\
   """,
-        div.toString());
+        div.toHtml());
   }
 
   @Test
@@ -88,6 +88,6 @@ class HtmlTest {
       </div>
       </div>\
       """,
-        div.toString());
+        div.toHtml());
   }
 }

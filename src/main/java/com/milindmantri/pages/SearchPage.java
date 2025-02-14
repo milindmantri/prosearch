@@ -3,7 +3,6 @@ package com.milindmantri.pages;
 import static com.milindmantri.Html.h1;
 
 import com.milindmantri.Html;
-import com.milindmantri.Html.Tag;
 import com.milindmantri.Html.VoidTag;
 import com.milindmantri.Main;
 import com.milindmantri.TantivyClient;
@@ -13,12 +12,7 @@ import java.util.stream.Stream;
 
 public class SearchPage {
 
-  private static final Html docType =
-      new Html() {
-        public String toString() {
-          return "<!DOCTYPE html>";
-        }
-      };
+  private static final Html docType = () -> "<!DOCTYPE html>";
 
   private static final String DEFAULT_TITLE = "Programmer's Search";
 
@@ -82,7 +76,7 @@ public class SearchPage {
   public Stream<Html> html() {
     Stream.Builder<Html> builder = Stream.builder();
 
-    builder.add(docType).add(new Tag("html", Map.of("lang", "en"), Stream.of(head(), body())));
+    builder.add(docType).add(Html.html(Stream.of(head(), body())));
 
     return builder.build();
   }
@@ -90,12 +84,11 @@ public class SearchPage {
   private Html head() {
     return Html.head(
         Stream.of(
-            new VoidTag("meta", Map.of("charset", "utf-8")),
-            new VoidTag(
-                "meta",
+            Html.meta(Map.of("charset", "utf-8")),
+            Html.meta(
                 Map.of("name", "viewport", "content", "width=device-width, initial-scale=1.0")),
             Html.title(this.title),
-            new Tag("style", CSS_STYLES)));
+            Html.style(CSS_STYLES)));
   }
 
   private Html body() {

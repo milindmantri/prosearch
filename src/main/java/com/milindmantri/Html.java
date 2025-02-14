@@ -5,9 +5,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+@FunctionalInterface
 public interface Html {
 
-  String toString();
+  String toHtml();
 
   record Tag(String name, Map<String, String> attributes, Stream<Html> innerTags) implements Html {
     /** empty tag */
@@ -28,7 +29,7 @@ public interface Html {
       this(name, attributes, Stream.empty());
     }
 
-    public String toString() {
+    public String toHtml() {
       // TODO: This can be done in a nice wrapper over string builder
       var sb = new StringBuilder();
       sb.append('<');
@@ -47,7 +48,7 @@ public interface Html {
       sb.append('\n');
 
       innerTags
-          .map(Html::toString)
+          .map(Html::toHtml)
           .forEach(
               str -> {
                 sb.append(str);
@@ -68,7 +69,7 @@ public interface Html {
       this(name, Collections.emptyMap());
     }
 
-    public String toString() {
+    public String toHtml() {
       // TODO: This can be done in a nice wrapper over string builder
       var sb = new StringBuilder();
       sb.append('<');
@@ -95,7 +96,7 @@ public interface Html {
       this(Stream.of(txt));
     }
 
-    public String toString() {
+    public String toHtml() {
       return text.collect(Collectors.joining());
     }
   }
@@ -158,6 +159,18 @@ public interface Html {
   }
 
   static Html script(Stream<Inner> js) {
-    return new Tag("script", Stream.of(new Inner(js.map(Inner::toString))));
+    return new Tag("script", Stream.of(new Inner(js.map(Inner::toHtml))));
+  }
+
+  static Html meta(Map<String, String> attributes) {
+    return new Tag("meta", attributes);
+  }
+
+  static Html style(String css) {
+    return new Tag("style", css);
+  }
+
+  static Html html(Stream<Html> elements) {
+    return new Tag("html", Map.of("lang", "en"), elements);
   }
 }

@@ -120,7 +120,7 @@ public class Main {
               try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
                   var writer = new BufferedWriter(outWriter)) {
 
-                sp.html().map(Html::toString).forEach(str -> Main.write(writer, str));
+                sp.html().map(Html::toHtml).forEach(str -> Main.write(writer, str));
               }
 
             } else {
@@ -129,7 +129,7 @@ public class Main {
               try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
                   var writer = new BufferedWriter(outWriter)) {
 
-                new SearchPage().html().map(Html::toString).forEach(str -> Main.write(writer, str));
+                new SearchPage().html().map(Html::toHtml).forEach(str -> Main.write(writer, str));
               }
             }
 
