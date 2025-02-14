@@ -85,7 +85,8 @@ impl IndexServer {
         // Don't search in urls unless specified
         let title_field = schema.get_field("title").unwrap();
         let body_field = schema.get_field("body").unwrap();
-        let search_fields = vec![title_field, body_field];
+        let desc_field = schema.get_field("desc").unwrap();
+        let search_fields = vec![title_field, body_field, desc_field];
 
         let mut query_parser =
             QueryParser::for_index(&index, search_fields);
@@ -96,6 +97,10 @@ impl IndexServer {
         // Default boost, if not set is 1.0
         // https://github.com/quickwit-oss/tantivy/blob/4aa8cd24707be1255599284f52eb6d388cf86ae8/src/query/query_parser/query_parser.rs#L687
         query_parser.set_field_boost(title_field, 2.0);
+
+        // One may miss the meta tag, after all it is metadata, but body should take higher priority
+        query_parser.set_field_boost(body_field, 1.5);
+        // description field by default has a boost of 1.0
 
         let reader = index.reader()?;
         let writer : IndexWriter = index.writer(50_000_000)?;
@@ -139,7 +144,7 @@ impl IndexServer {
         let hits: Vec<Hit> =
             top_docs
                 .iter()
-                .map(|(score, doc_address)| {
+                .map(|(_, doc_address)| {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
 
                     let snippet = snippet_generator.snippet_from_doc(&doc).to_html();
@@ -185,6 +190,14 @@ impl IndexServer {
                     ),
                     Some(_) => {},
                 }
+            }
+
+            match obj.get_key_value::<String>(&"desc".to_string()) {
+                None => {},
+                Some(val) if !val.1.is_string() => return Some(
+                    InvalidArgument("\"desc\" field must have a string value.".to_string())
+                ),
+                Some(_) => {},
             }
         } else {
             return Some(
