@@ -9,6 +9,10 @@ import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.collector.http.delay.impl.GenericDelayResolver;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.text.TextMatcher;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.stream.Stream;
@@ -47,7 +51,16 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setUrlNormalizer(new GenericURLNormalizer());
 
     // TODO: pass list of all URLs to crawl
-    crawlerConfig.setStartURLs("https://www.php.net", "https://elm-lang.org");
+    ClassLoader classloader = Thread.currentThread().getContextClassLoader();
+    try (InputStream is = classloader.getResourceAsStream("start-urls");
+        var isr = new InputStreamReader(is);
+        var reader = new BufferedReader(isr)) {
+
+      crawlerConfig.setStartURLs(reader.lines().toString());
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
 
     crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
 
