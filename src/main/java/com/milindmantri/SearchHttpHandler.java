@@ -1,12 +1,13 @@
 package com.milindmantri;
 
+import static com.milindmantri.Main.write;
+
 import com.milindmantri.pages.SearchPage;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -74,14 +75,6 @@ public record SearchHttpHandler(TantivyClient tantivyClient) implements HttpHand
       }
     } finally {
       exchange.close();
-    }
-  }
-
-  private static void write(final Writer writer, final String str) {
-    try {
-      writer.write(str);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 }

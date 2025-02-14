@@ -27,6 +27,7 @@ public class SearchPage {
     form input {
       font-size: 1.2rem;
       padding: 0.5rem;
+      margin-bottom: 1rem;
     }
 
     form input[type="text"] {
@@ -124,6 +125,9 @@ public class SearchPage {
           Html.pStrong(
               "Search latency: %.3fms".formatted(this.results.latency().toNanos() / 1_000_000.0)));
     }
+
+    builder.add(
+        Html.div(Stream.of(Html.a("/stats/", false, Stream.of(new Html.Inner("Statistics"))))));
 
     return Html.body(builder.build());
   }

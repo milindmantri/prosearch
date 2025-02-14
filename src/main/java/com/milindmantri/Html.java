@@ -169,4 +169,29 @@ public interface Html {
   static Html html(Stream<Html> elements) {
     return new Tag("html", Map.of("lang", "en"), elements);
   }
+
+  // TODO: This can also have semantic validations, like only allow th and td tags inside.
+  static Html tr(Stream<Html> elements) {
+    return new Tag("tr", elements);
+  }
+
+  static Html th(String text) {
+    return new Tag("th", text);
+  }
+
+  static Html td(String text) {
+    return new Tag("td", text);
+  }
+
+  static Html thead(Stream<Html> thElements) {
+    return new Tag("thead", Stream.of(Html.tr(thElements)));
+  }
+
+  static Html table(Html tHead, Html tBody) {
+    return new Tag("table", Stream.of(tHead, tBody));
+  }
+
+  static Html tbody(Stream<Html> trows) {
+    return new Tag("tbody", trows);
+  }
 }

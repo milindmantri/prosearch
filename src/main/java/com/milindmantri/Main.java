@@ -39,7 +39,6 @@ public class Main {
       )
       """;
 
-
   public static void main(String[] args)
       throws SQLException, ExecutionException, InterruptedException, IOException {
 
@@ -67,21 +66,25 @@ public class Main {
 
       int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
 
-      HttpServer httpServer = httpServer(httpPort, client);
+      HttpServer httpServer = httpServer(httpPort, client, dataSource);
 
       httpServer.start();
+
+      Thread.currentThread().join();
     }
   }
 
-  static HttpServer httpServer(final int port, final TantivyClient tantivyClient)
+  static HttpServer httpServer(
+      final int port, final TantivyClient tantivyClient, final DataSource datasource)
       throws IOException {
     HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
     httpServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
     httpServer.createContext("/search/", new SearchHttpHandler(tantivyClient));
+    httpServer.createContext(
+        StatisticsHttpHandler.STATISTICS_PAGE_PATH, new StatisticsHttpHandler(datasource));
     return httpServer;
   }
-
 
   static void createStatsTableIfNotExists(final DataSource datasource) throws SQLException {
     try (var con = datasource.getConnection();
@@ -110,5 +113,13 @@ public class Main {
     props.put("password", List.of("pass"));
 
     return new com.norconex.commons.lang.map.Properties(props);
+  }
+
+  public static void write(final Writer writer, final String str) {
+    try {
+      writer.write(str);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
