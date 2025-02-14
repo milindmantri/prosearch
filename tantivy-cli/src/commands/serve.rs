@@ -139,15 +139,34 @@ impl IndexServer {
         };
 
         let body = self.schema.get_field("body").unwrap();
-        let snippet_generator = SnippetGenerator::create(&searcher, &*query, body)?;
 
         let hits: Vec<Hit> =
             top_docs
                 .iter()
                 .map(|(_, doc_address)| {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
+                    let desc_field = self.schema.get_field("desc").unwrap();
 
-                    let snippet = snippet_generator.snippet_from_doc(&doc).to_html();
+                    let snippet : String = match doc.get_first(desc_field).unwrap().into() {
+                        OwnedValue::Str(mut string) => {
+                            // max tantivy snippet size - 150 chars
+                            if string.len() > 180 {
+                                string.truncate(180);
+                                let mut s = String::new();
+                                s.push_str(string.trim_end());
+                                s.push_str("...");
+                                s
+                            } else {
+                                string
+                            }
+                        },
+                        _ => {
+                            let snippet_generator = SnippetGenerator::create(&searcher, &*query, body).unwrap();
+
+                            snippet_generator.snippet_from_doc(&doc).to_html()
+                        }
+                    };
+
                     self.create_hit(doc, snippet)
                 })
                 .collect();
