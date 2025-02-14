@@ -73,7 +73,7 @@ class TantivyCommitterTest {
               Map.of(
                   "title",
                   List.of("Example Title"),
-                  "description",
+                  "Description",
                   List.of("Example description")));
 
       assertDoesNotThrow(

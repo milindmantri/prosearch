@@ -11,6 +11,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -49,30 +52,43 @@ public class TantivyCommitter extends AbstractCommitter {
 
       Optional<Long> maybeIndexedBytesLength;
 
-      if (upsertRequest.getMetadata().containsKey("title")) {
-        if (upsertRequest.getMetadata().containsKey("description")) {
+      Map<String, List<String>> lowerCaseProps =
+          upsertRequest.getMetadata().entrySet().stream()
+              .collect(
+                  Collectors.toMap(
+                      e -> e.getKey().toLowerCase(),
+                      Map.Entry::getValue,
+                      (l, r) -> {
+                        var list = new ArrayList<String>();
+                        list.addAll(l);
+                        list.addAll(r);
+                        return list;
+                      }));
+
+      if (lowerCaseProps.containsKey("title")) {
+
+        final String title = lowerCaseProps.get("title").getFirst();
+
+        if (lowerCaseProps.containsKey("description")) {
           maybeIndexedBytesLength =
               client.indexAndLength(
                   uri,
-                  upsertRequest.getMetadata().getString("title"),
+                  title,
                   inputStreamReader(upsertRequest.getContent()),
-                  upsertRequest.getMetadata().getString("description"));
+                  lowerCaseProps.get("description").getFirst());
         } else {
           maybeIndexedBytesLength =
-              client.indexAndLength(
-                  uri,
-                  upsertRequest.getMetadata().getString("title"),
-                  inputStreamReader(upsertRequest.getContent()));
+              client.indexAndLength(uri, title, inputStreamReader(upsertRequest.getContent()));
         }
 
       } else {
 
-        if (upsertRequest.getMetadata().containsKey("description")) {
+        if (lowerCaseProps.containsKey("description")) {
           maybeIndexedBytesLength =
               client.indexAndLengthNoTitleWithDescription(
                   uri,
                   inputStreamReader(upsertRequest.getContent()),
-                  upsertRequest.getMetadata().getString("description"));
+                  lowerCaseProps.get("description").getFirst());
         } else {
 
           maybeIndexedBytesLength =
