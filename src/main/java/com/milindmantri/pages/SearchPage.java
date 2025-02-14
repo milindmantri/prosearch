@@ -4,7 +4,7 @@ import static com.milindmantri.Html.h1;
 
 import com.milindmantri.Html;
 import com.milindmantri.Html.VoidTag;
-import com.milindmantri.Main;
+import com.milindmantri.SearchHttpHandler;
 import com.milindmantri.TantivyClient;
 import java.util.Map;
 import java.util.Objects;
@@ -101,7 +101,10 @@ public class SearchPage {
                 "",
                 "Search",
                 Stream.of(
-                    Html.inputText(Main.QUERY_PARAM, this.searchTerm, "Type your text here..."))));
+                    Html.inputText(
+                        SearchHttpHandler.QUERY_PARAM,
+                        this.searchTerm,
+                        "Type your text here..."))));
 
     if (!this.searchTerm.isBlank()) {
 

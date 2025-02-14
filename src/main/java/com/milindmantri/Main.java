@@ -1,19 +1,13 @@
 package com.milindmantri;
 
-import com.milindmantri.pages.SearchPage;
 import com.sun.net.httpserver.HttpServer;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -22,10 +16,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.utils.URLEncodedUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class Main {
 
@@ -49,9 +39,6 @@ public class Main {
       )
       """;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
-
-  public static final String QUERY_PARAM = "q";
 
   public static void main(String[] args)
       throws SQLException, ExecutionException, InterruptedException, IOException {
@@ -91,71 +78,10 @@ public class Main {
     HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
     httpServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
-    httpServer.createContext(
-        "/search/",
-        exchange -> {
-          final URI uri = exchange.getRequestURI();
-          final List<NameValuePair> nvp =
-              URLEncodedUtils.parse(uri.getRawQuery(), StandardCharsets.UTF_8);
-
-          final var maybeSearchTerm =
-              nvp.stream()
-                  .filter(n -> QUERY_PARAM.equals(n.getName()))
-                  .map(NameValuePair::getValue)
-                  .filter(str -> !str.isBlank())
-                  .findFirst();
-
-          exchange.getResponseHeaders().add("Content-Type", "text/html");
-
-          try {
-            if (maybeSearchTerm.isPresent()) {
-              final String term = maybeSearchTerm.get();
-
-              var searchResult =
-                  tantivyClient.search(URLEncoder.encode(term, StandardCharsets.UTF_8));
-
-              var sp = new SearchPage(term, searchResult);
-
-              // need to send response headers before calling getResponseBody (API limitation)
-              exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
-
-              try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
-                  var writer = new BufferedWriter(outWriter)) {
-
-                sp.html().map(Html::toHtml).forEach(str -> Main.write(writer, str));
-              }
-
-            } else {
-              // empty search page
-              exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
-              try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
-                  var writer = new BufferedWriter(outWriter)) {
-
-                new SearchPage().html().map(Html::toHtml).forEach(str -> Main.write(writer, str));
-              }
-            }
-
-          } catch (Exception e) {
-            exchange.sendResponseHeaders(HttpURLConnection.HTTP_INTERNAL_ERROR, 0);
-            try (var outWriter = new OutputStreamWriter(exchange.getResponseBody());
-                var writer = new BufferedWriter(outWriter)) {
-              LOGGER.error("Failed to process request.", e);
-              writer.write("Internal server error. Contact: milind -at- milindmantri -dot- com");
-            }
-          } finally {
-            exchange.close();
-          }
-        });
+    httpServer.createContext("/search/", new SearchHttpHandler(tantivyClient));
     return httpServer;
   }
 
-  private static void write(final Writer writer, final String str) {
-    try {
-      writer.write(str);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
 
   static void createStatsTableIfNotExists(final DataSource datasource) throws SQLException {
     try (var con = datasource.getConnection();
