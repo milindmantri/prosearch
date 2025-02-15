@@ -12,8 +12,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(DomainCounter.class);
 
   private static final GenericURLNormalizer URL_NORMALIZER = new GenericURLNormalizer();
 
@@ -64,8 +68,10 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
 
   @Override
   public boolean acceptReference(final String ref) {
-    final String reference = URL_NORMALIZER.normalizeURL(ref);
-    String host = URI.create(reference).getHost();
+    final String normalized = URL_NORMALIZER.normalizeURL(ref);
+    final URI uri = URI.create(normalized);
+    final String host = uri.getRawAuthority();
+    final String reference = removeScheme(uri);
 
     // TODO: insertIntoDb and local count handling should happen in a txn
 
@@ -73,6 +79,7 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       AtomicInteger i = count.get(host);
 
       if (i.get() == limit) {
+        LOGGER.info("Limit reached: host {} ref {}", host, reference);
         return false;
       } else {
         return insertIntoDb(host, reference) && i.incrementAndGet() <= limit;
@@ -169,10 +176,26 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
       return true;
     } catch (SQLException e) {
       if (PG_UNIQUE_VIOLATION_ERR_CODE.equals(e.getSQLState())) {
+        LOGGER.info("Rejecting duplicate: host {} ref {}", host, reference);
         return false;
       } else {
         throw new RuntimeException(e);
       }
     }
+  }
+
+  private static String removeScheme(final URI uri) {
+    var sb = new StringBuilder();
+    sb.append(uri.getRawAuthority());
+    if (uri.getRawPath() != null) {
+      sb.append(uri.getRawPath());
+    }
+
+    if (uri.getRawQuery() != null) {
+      sb.append('?');
+      sb.append(uri.getRawQuery());
+    }
+
+    return sb.toString();
   }
 }

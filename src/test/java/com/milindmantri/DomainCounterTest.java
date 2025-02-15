@@ -126,7 +126,7 @@ class DomainCounterTest {
   void insertEntryOnNewLink() throws SQLException {
     var dc = new DomainCounter(1, datasource);
 
-    final String link = "https://www.php.net/new-link";
+    final String link = "https://www.php.net/new-link?hello=work";
 
     assertTrue(dc.acceptReference(link));
 
@@ -140,7 +140,7 @@ class DomainCounterTest {
       String url = rs.getString(2);
 
       assertEquals("www.php.net", host);
-      assertEquals(link, url);
+      assertEquals("www.php.net/new-link?hello=work", url);
     }
   }
 
@@ -162,7 +162,7 @@ class DomainCounterTest {
       String url = rs.getString(2);
 
       assertEquals("www.php.net", host);
-      assertEquals("https://www.php.net/new-link", url);
+      assertEquals("www.php.net/new-link", url);
     }
   }
 
@@ -183,11 +183,11 @@ class DomainCounterTest {
 
       assertTrue(rs.next());
       assertEquals("www.php.net", rs.getString(1));
-      assertEquals(link1, rs.getString(2));
+      assertEquals("www.php.net/new-link", rs.getString(2));
 
       assertTrue(rs.next());
       assertEquals("www.php.net", rs.getString(1));
-      assertEquals(link2, rs.getString(2));
+      assertEquals("www.php.net/new-link2", rs.getString(2));
 
       assertFalse(rs.next());
     }
@@ -210,7 +210,7 @@ class DomainCounterTest {
 
       assertTrue(rs.next());
       assertEquals("www.php.net", rs.getString(1));
-      assertEquals(link1, rs.getString(2));
+      assertEquals("www.php.net/new-link", rs.getString(2));
       assertFalse(rs.next());
     }
   }
