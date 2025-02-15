@@ -30,6 +30,8 @@ use std::fmt::{self, Debug};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
+use tantivy::query::Query;
+use tantivy::Searcher;
 use tantivy::collector::{TopDocs};
 use tantivy::query::QueryParser;
 use tantivy::schema::NamedFieldDocument;
@@ -42,6 +44,8 @@ use tantivy::{IndexReader, IndexWriter};
 use tantivy::TantivyDocument;
 use tantivy::TantivyError::InvalidArgument;
 use tantivy::snippet::{SnippetGenerator};
+use tantivy::snippet::Snippet;
+use tantivy::schema::Field;
 use urlencoded::UrlEncodedQuery;
 use bodyparser::Json;
 use serde_json::Map;
@@ -138,32 +142,37 @@ impl IndexServer {
             )?
         };
 
-        let body = self.schema.get_field("body").unwrap();
-
         let hits: Vec<Hit> =
             top_docs
                 .iter()
                 .map(|(_, doc_address)| {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
                     let desc_field = self.schema.get_field("desc").unwrap();
+                    let body_field = self.schema.get_field("body").unwrap();
 
-                    let snippet : String = match doc.get_first(desc_field).unwrap().into() {
-                        OwnedValue::Str(mut string) => {
-                            // max tantivy snippet size - 150 chars
-                            if string.len() > 180 {
-                                string.truncate(180);
-                                let mut s = String::new();
-                                s.push_str(string.trim_end());
-                                s.push_str("...");
-                                s
-                            } else {
-                                string
-                            }
+                    // if description has terms, we use that as snippet
+                    let snippet : String = match doc.get_first(desc_field) {
+                        Some(owned_value) => match owned_value.into() {
+                            OwnedValue::Str(string) => {
+                                let desc_snip_gen =
+                                    SnippetGenerator::create(&searcher, &*query, desc_field)
+                                        .unwrap();
+
+                                let desc_snip = desc_snip_gen.snippet(&string);
+                                if desc_snip.is_empty() {
+                                    self.gen_html_snippet(&doc, &searcher, &*query, body_field)
+                                        .to_html()
+                                } else {
+                                    desc_snip.to_html()
+                                }
+                            },
+                            _ => {
+                                self.gen_html_snippet(&doc, &searcher, &*query, body_field)
+                                    .to_html()}
                         },
-                        _ => {
-                            let snippet_generator = SnippetGenerator::create(&searcher, &*query, body).unwrap();
-
-                            snippet_generator.snippet_from_doc(&doc).to_html()
+                        None => {
+                            self.gen_html_snippet(&doc, &searcher, &*query, body_field)
+                                .to_html()
                         }
                     };
 
@@ -175,6 +184,18 @@ impl IndexServer {
             hits,
             timings: timer_tree,
         })
+    }
+
+    fn gen_html_snippet(
+        &self,
+        doc: &TantivyDocument,
+        searcher: &Searcher,
+        query: &dyn Query,
+        field: Field
+    ) -> Snippet {
+        SnippetGenerator::create(&searcher, &*query, field)
+            .unwrap()
+            .snippet_from_doc(doc)
     }
 
     // https://github.com/quickwit-oss/tantivy/blob/main/examples/deleting_updating_documents.rs
