@@ -16,7 +16,8 @@ import javax.sql.DataSource;
 
 public final class CrawlerRunner implements Runnable {
 
-  private static final int PER_HOST_CRAWLING_LIMIT = 10_000;
+  private static final int PER_HOST_CRAWLING_LIMIT =
+      Integer.parseInt(System.getProperty("per-host-crawling-limit", "10000"));
 
   private final DataSource datasource;
   private final TantivyClient client;
