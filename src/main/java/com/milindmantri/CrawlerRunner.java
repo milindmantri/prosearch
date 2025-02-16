@@ -5,6 +5,7 @@ import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.collector.http.delay.impl.GenericDelayResolver;
+import com.norconex.collector.http.url.IURLNormalizer;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -18,6 +19,8 @@ public final class CrawlerRunner implements Runnable {
 
   private static final int PER_HOST_CRAWLING_LIMIT =
       Integer.parseInt(System.getProperty("per-host-crawling-limit", "10000"));
+
+  public static final IURLNormalizer URL_NORMALIZER = new GenericURLNormalizer();
 
   private final DataSource datasource;
   private final TantivyClient client;
@@ -45,7 +48,7 @@ public final class CrawlerRunner implements Runnable {
 
     // TODO: Delete orphan URLs and spoiled refs
 
-    crawlerConfig.setUrlNormalizer(new GenericURLNormalizer());
+    crawlerConfig.setUrlNormalizer(URL_NORMALIZER);
 
     // TODO: pass list of all URLs to crawl
     ClassLoader classloader = Thread.currentThread().getContextClassLoader();
@@ -84,6 +87,7 @@ public final class CrawlerRunner implements Runnable {
       crawlerConfig.setDataStoreEngine(engine);
 
       var domainCounter = new DomainCounter(PER_HOST_CRAWLING_LIMIT, this.datasource);
+      crawlerConfig.setReferenceFilters(domainCounter);
       crawlerConfig.setEventListeners(domainCounter);
       crawlerConfig.setMetadataFilters(domainCounter);
 

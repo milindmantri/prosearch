@@ -2,6 +2,7 @@ package com.milindmantri;
 
 import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.filter.IMetadataFilter;
+import com.norconex.collector.core.filter.IReferenceFilter;
 import com.norconex.collector.core.filter.impl.MetadataFilter;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
@@ -19,7 +20,7 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DomainCounter implements IMetadataFilter, IEventListener<Event> {
+public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IReferenceFilter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DomainCounter.class);
 
@@ -78,6 +79,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event> {
         CONTENT_TYPE_FILTERS.stream().anyMatch(f -> f.acceptMetadata(ref, metadata));
 
     if (!isContentValid) {
+      LOGGER.info("Unacceptable content for ref {}", ref);
       return false;
     }
 
@@ -92,7 +94,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event> {
       AtomicInteger i = count.get(host);
 
       if (i.get() == limit) {
-        LOGGER.info("Limit reached: host {} ref {}", host, reference);
+        LOGGER.info("Filtered by metadata: host {}, ref {}", host, reference);
         return false;
       } else {
         return insertIntoDb(host, reference) && i.incrementAndGet() <= limit;
@@ -143,6 +145,32 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event> {
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
+    }
+  }
+
+  // This is a faster track to reject URLs when limit is reached instead of doing a HEAD request
+  // and rejecting then in the metadata filter.
+  // When true, it is left to the metadata filter to accept or not.
+  @Override
+  public boolean acceptReference(final String reference) {
+
+    // since acceptMetadata will get a normalized URL only
+    final String normalized = CrawlerRunner.URL_NORMALIZER.normalizeURL(reference);
+
+    // ref is already normalized
+    final URI uri = URI.create(normalized);
+    final String host = uri.getRawAuthority();
+    if (count.containsKey(host)) {
+      AtomicInteger i = count.get(host);
+
+      if (i.get() == limit) {
+        LOGGER.info("Filtered by reference: host {}, ref {}", host, reference);
+        return false;
+      } else {
+        return true;
+      }
+    } else {
+      return true;
     }
   }
 

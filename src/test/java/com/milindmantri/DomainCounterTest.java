@@ -259,6 +259,19 @@ class DomainCounterTest {
     }
   }
 
+  @Test
+  void stopAfterLimitRefFilter() throws SQLException {
+    // should stop after limit is reached
+    DomainCounter dc = new DomainCounter(3, datasource);
+
+    assertTrue(
+        IntStream.range(0, 3)
+            .mapToObj(i -> dc.acceptReference("http://host.com/%d".formatted(i)))
+            .allMatch(b -> b));
+
+    assertFalse(dc.acceptReference("http://host.com/4"));
+  }
+
   private static Properties dbProps() {
     var props = new Properties();
     props.put("jdbcUrl", "jdbc:postgresql://localhost:5432/test");
