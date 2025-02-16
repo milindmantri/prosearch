@@ -52,7 +52,7 @@ public final class CrawlerRunner implements Runnable {
         var isr = new InputStreamReader(is);
         var reader = new BufferedReader(isr)) {
 
-      crawlerConfig.setStartURLs(reader.lines().toString());
+      crawlerConfig.setStartURLs(reader.lines().toList());
 
     } catch (IOException e) {
       throw new RuntimeException(e);
