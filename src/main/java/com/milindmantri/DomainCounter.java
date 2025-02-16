@@ -4,10 +4,14 @@ import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.filter.IMetadataFilter;
 import com.norconex.collector.core.filter.IReferenceFilter;
 import com.norconex.collector.core.filter.impl.MetadataFilter;
+import com.norconex.collector.http.fetch.HttpMethod;
+import com.norconex.collector.http.fetch.IHttpFetcher;
+import com.norconex.collector.http.fetch.impl.GenericHttpFetcher;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
 import com.norconex.commons.lang.map.Properties;
 import com.norconex.commons.lang.text.TextMatcher;
+import com.norconex.importer.doc.Doc;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -53,6 +57,28 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
   private final Map<String, AtomicInteger> count = new ConcurrentHashMap<>();
 
   private final DataSource dataSource;
+
+  private final GenericHttpFetcher modifiedHttpFetcher =
+      new GenericHttpFetcher() {
+        @Override
+        public boolean accept(final Doc doc, final HttpMethod httpMethod) {
+
+          // Done because already queued docs don't go through ref filter again
+          // And if we have already hit the limit, why fetch queued docs
+          if (httpMethod == HttpMethod.HEAD && doc.getReference() != null) {
+            if (acceptReference(doc.getReference())) {
+              return super.accept(doc, httpMethod);
+            } else {
+              LOGGER.info(
+                  "Rejecting from HTTP fetcher since limit reached for ref {}", doc.getReference());
+              return false;
+            }
+          } else {
+
+            return super.accept(doc, httpMethod);
+          }
+        }
+      };
 
   /** Caller is responsible for closing dataSource */
   public DomainCounter(final int limit, final DataSource dataSource) throws SQLException {
@@ -172,6 +198,10 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     } else {
       return true;
     }
+  }
+
+  public IHttpFetcher httpFetcher() {
+    return this.modifiedHttpFetcher;
   }
 
   private void restoreCount() throws SQLException {

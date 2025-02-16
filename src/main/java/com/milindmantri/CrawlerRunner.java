@@ -90,6 +90,7 @@ public final class CrawlerRunner implements Runnable {
       crawlerConfig.setReferenceFilters(domainCounter);
       crawlerConfig.setEventListeners(domainCounter);
       crawlerConfig.setMetadataFilters(domainCounter);
+      crawlerConfig.setHttpFetchers(domainCounter.httpFetcher());
 
       crawlerConfig.setCommitters(new TantivyCommitter(this.client, this.datasource));
 
