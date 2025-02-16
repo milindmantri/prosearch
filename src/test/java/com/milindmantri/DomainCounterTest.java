@@ -7,6 +7,8 @@ import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
@@ -28,6 +30,9 @@ class DomainCounterTest {
     """;
 
   private final Crawler mockCrawler = Mockito.mock(Crawler.class);
+
+  private static final com.norconex.commons.lang.map.Properties VALID_PROPS =
+      new com.norconex.commons.lang.map.Properties(Map.of("content-type", List.of("text/html")));
 
   @AfterAll
   static void closeDataSource() {
@@ -65,10 +70,10 @@ class DomainCounterTest {
 
     assertTrue(
         IntStream.range(0, 3)
-            .mapToObj(i -> dc.acceptReference("http://host.com/%d".formatted(i)))
+            .mapToObj(i -> dc.acceptMetadata("http://host.com/%d".formatted(i), VALID_PROPS))
             .allMatch(b -> b));
 
-    assertFalse(dc.acceptReference("http://host.com/4"));
+    assertFalse(dc.acceptMetadata("http://host.com/4", VALID_PROPS));
   }
 
   @Test
@@ -89,9 +94,9 @@ class DomainCounterTest {
 
     DomainCounter dc = new DomainCounter(3, datasource);
 
-    assertTrue(dc.acceptReference("http://host.com/3"));
+    assertTrue(dc.acceptMetadata("http://host.com/3", VALID_PROPS));
 
-    assertFalse(dc.acceptReference("http://host.com/4"));
+    assertFalse(dc.acceptMetadata("http://host.com/4", VALID_PROPS));
   }
 
   @Test
@@ -128,7 +133,7 @@ class DomainCounterTest {
 
     final String link = "https://www.php.net/new-link?hello=work";
 
-    assertTrue(dc.acceptReference(link));
+    assertTrue(dc.acceptMetadata(link, VALID_PROPS));
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
@@ -150,7 +155,7 @@ class DomainCounterTest {
 
     final String link = "https://www.php.net/new-link#fragment-data";
 
-    assertTrue(dc.acceptReference(link));
+    assertTrue(dc.acceptMetadata(link, VALID_PROPS));
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
@@ -167,14 +172,40 @@ class DomainCounterTest {
   }
 
   @Test
+  void invalidProps() throws SQLException {
+    var dc = new DomainCounter(1, datasource);
+
+    final String link = "https://www.php.net/new-link";
+
+    assertFalse(
+        dc.acceptMetadata(
+            link,
+            new com.norconex.commons.lang.map.Properties(
+                Map.of("content-type", List.of("image/jpeg")))));
+  }
+
+  @Test
+  void invalidProps2() throws SQLException {
+    var dc = new DomainCounter(1, datasource);
+
+    final String link = "https://www.php.net/new-link";
+
+    assertFalse(
+        dc.acceptMetadata(
+            link,
+            new com.norconex.commons.lang.map.Properties(
+                Map.of("Content-Type", List.of("image/png")))));
+  }
+
+  @Test
   void insertEntryOnNewLink2() throws SQLException {
     var dc = new DomainCounter(2, datasource);
 
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link2";
 
-    assertTrue(dc.acceptReference(link1));
-    assertTrue(dc.acceptReference(link2));
+    assertTrue(dc.acceptMetadata(link1, VALID_PROPS));
+    assertTrue(dc.acceptMetadata(link2, VALID_PROPS));
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
@@ -200,8 +231,8 @@ class DomainCounterTest {
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link#frag-on-same-link";
 
-    assertTrue(dc.acceptReference(link1));
-    assertFalse(dc.acceptReference(link2));
+    assertTrue(dc.acceptMetadata(link1, VALID_PROPS));
+    assertFalse(dc.acceptMetadata(link2, VALID_PROPS));
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM host_count")) {

@@ -1,21 +1,17 @@
 package com.milindmantri;
 
-import com.norconex.collector.core.filter.IMetadataFilter;
-import com.norconex.collector.core.filter.impl.MetadataFilter;
 import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.collector.http.delay.impl.GenericDelayResolver;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
-import com.norconex.commons.lang.text.TextMatcher;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.util.stream.Stream;
 import javax.sql.DataSource;
 
 public final class CrawlerRunner implements Runnable {
@@ -80,7 +76,6 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setIgnoreCanonicalLinks(true);
     crawlerConfig.setFetchHttpHead(true);
-    crawlerConfig.setMetadataFilters(getTextOnlyMetadataFilters().toList());
 
     try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine()) {
 
@@ -89,7 +84,7 @@ public final class CrawlerRunner implements Runnable {
 
       var domainCounter = new DomainCounter(PER_HOST_CRAWLING_LIMIT, this.datasource);
       crawlerConfig.setEventListeners(domainCounter);
-      crawlerConfig.setReferenceFilters(domainCounter);
+      crawlerConfig.setMetadataFilters(domainCounter);
 
       crawlerConfig.setCommitters(new TantivyCommitter(this.client, this.datasource));
 
@@ -105,17 +100,5 @@ public final class CrawlerRunner implements Runnable {
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private static Stream<IMetadataFilter> getTextOnlyMetadataFilters() {
-    return Stream.of("text/html", "application/xhtml+xml", "text/plain")
-        .map(t -> t + "*")
-        .mapMulti(
-            (t, c) -> {
-              c.accept(
-                  new MetadataFilter(TextMatcher.basic("Content-Type"), TextMatcher.wildcard(t)));
-              c.accept(
-                  new MetadataFilter(TextMatcher.basic("content-type"), TextMatcher.wildcard(t)));
-            });
   }
 }

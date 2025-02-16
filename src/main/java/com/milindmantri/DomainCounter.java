@@ -1,25 +1,29 @@
 package com.milindmantri;
 
 import com.norconex.collector.core.crawler.CrawlerEvent;
-import com.norconex.collector.core.filter.IReferenceFilter;
-import com.norconex.collector.http.url.impl.GenericURLNormalizer;
+import com.norconex.collector.core.filter.IMetadataFilter;
+import com.norconex.collector.core.filter.impl.MetadataFilter;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
+import com.norconex.commons.lang.map.Properties;
+import com.norconex.commons.lang.text.TextMatcher;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
+public class DomainCounter implements IMetadataFilter, IEventListener<Event> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DomainCounter.class);
 
-  private static final GenericURLNormalizer URL_NORMALIZER = new GenericURLNormalizer();
+  private static final List<IMetadataFilter> CONTENT_TYPE_FILTERS = getTextOnlyMetadataFilters();
 
   // Visible to tests
   static final String CREATE_TABLE =
@@ -67,9 +71,18 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
   }
 
   @Override
-  public boolean acceptReference(final String ref) {
-    final String normalized = URL_NORMALIZER.normalizeURL(ref);
-    final URI uri = URI.create(normalized);
+  public boolean acceptMetadata(final String ref, final Properties metadata) {
+    // Only if content-type matches expectation, we want to play with host_count
+
+    final boolean isContentValid =
+        CONTENT_TYPE_FILTERS.stream().anyMatch(f -> f.acceptMetadata(ref, metadata));
+
+    if (!isContentValid) {
+      return false;
+    }
+
+    // ref is already normalized
+    final URI uri = URI.create(ref);
     final String host = uri.getRawAuthority();
     final String reference = removeScheme(uri);
 
@@ -197,5 +210,18 @@ public class DomainCounter implements IReferenceFilter, IEventListener<Event> {
     }
 
     return sb.toString();
+  }
+
+  private static List<IMetadataFilter> getTextOnlyMetadataFilters() {
+    return Stream.of("text/html", "application/xhtml+xml", "text/plain")
+        .map(t -> t + "*")
+        .<IMetadataFilter>mapMulti(
+            (t, c) -> {
+              c.accept(
+                  new MetadataFilter(TextMatcher.basic("Content-Type"), TextMatcher.wildcard(t)));
+              c.accept(
+                  new MetadataFilter(TextMatcher.basic("content-type"), TextMatcher.wildcard(t)));
+            })
+        .toList();
   }
 }
