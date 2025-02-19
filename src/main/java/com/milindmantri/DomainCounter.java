@@ -119,7 +119,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     if (count.containsKey(host)) {
       AtomicInteger i = count.get(host);
 
-      if (i.get() == limit) {
+      if (i.get() >= limit) {
         LOGGER.info("Filtered by metadata: host {}, ref {}", host, reference);
         return false;
       } else {
