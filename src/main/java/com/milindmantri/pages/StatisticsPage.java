@@ -67,7 +67,7 @@ public class StatisticsPage {
   private Html body() {
     var builder = Stream.<Html>builder();
 
-    var tHead = Html.thead(Stream.of(Html.th("Domain"), Html.th("Links"), Html.th("Size")));
+    var tHead = Html.thead(Stream.of(Html.th("Domain"), Html.th("Indexed Pages"), Html.th("Size")));
 
     Stream<Html> rows =
         this.stats.map(
