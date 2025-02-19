@@ -4,7 +4,7 @@ import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
-import com.norconex.collector.http.delay.impl.GenericDelayResolver;
+import com.norconex.collector.http.link.impl.HtmlLinkExtractor;
 import com.norconex.collector.http.url.IURLNormalizer;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import java.io.BufferedReader;
@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
-import java.time.Duration;
 import javax.sql.DataSource;
 
 public final class CrawlerRunner implements Runnable {
@@ -64,12 +63,6 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
 
-    GenericDelayResolver delayResolver = new GenericDelayResolver();
-    int delayInSeconds = Integer.parseInt(System.getProperty("crawl-download-delay-seconds", "1"));
-
-    delayResolver.setDefaultDelay(Duration.ofSeconds(delayInSeconds).toMillis());
-    crawlerConfig.setDelayResolver(delayResolver);
-
     crawlerConfig.setId(System.getProperty("crawler-id", "crwlr"));
 
     // TODO: What about the case for redirected domains, like openjdk.java.net
@@ -80,17 +73,25 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setIgnoreCanonicalLinks(true);
     crawlerConfig.setFetchHttpHead(true);
+    crawlerConfig.setIgnoreSitemap(true);
 
     try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine()) {
 
       engine.setConfigProperties(Main.dbProps());
       crawlerConfig.setDataStoreEngine(engine);
 
+      var htmlLinkExtractor = new HtmlLinkExtractor();
+      htmlLinkExtractor.setIgnoreLinkData(true);
+      htmlLinkExtractor.removeLinkTag("img", "src");
+
+      crawlerConfig.setLinkExtractors(htmlLinkExtractor);
+
       var domainCounter = new DomainCounter(PER_HOST_CRAWLING_LIMIT, this.datasource);
       crawlerConfig.setReferenceFilters(domainCounter);
       crawlerConfig.setEventListeners(domainCounter);
       crawlerConfig.setMetadataFilters(domainCounter);
       crawlerConfig.setHttpFetchers(domainCounter.httpFetcher());
+      crawlerConfig.setDelayResolver(domainCounter.delayResolver());
 
       crawlerConfig.setCommitters(new TantivyCommitter(this.client, this.datasource));
 
