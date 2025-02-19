@@ -4,9 +4,13 @@ import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.filter.IMetadataFilter;
 import com.norconex.collector.core.filter.IReferenceFilter;
 import com.norconex.collector.core.filter.impl.MetadataFilter;
+import com.norconex.collector.http.delay.IDelayResolver;
+import com.norconex.collector.http.delay.impl.AbstractDelayResolver;
+import com.norconex.collector.http.delay.impl.GenericDelayResolver;
 import com.norconex.collector.http.fetch.HttpMethod;
 import com.norconex.collector.http.fetch.IHttpFetcher;
 import com.norconex.collector.http.fetch.impl.GenericHttpFetcher;
+import com.norconex.collector.http.robot.RobotsTxt;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
 import com.norconex.commons.lang.map.Properties;
@@ -58,11 +62,30 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
 
   private final DataSource dataSource;
 
+  private final GenericDelayResolver delayResolver =
+      new GenericDelayResolver() {
+        @Override
+        public void delay(final RobotsTxt robotsTxt, final String url) {
+          if (acceptReference(url)) {
+            super.delay(robotsTxt, url);
+          }
+        }
+
+        @Override
+        protected long resolveExplicitDelay(final String url) {
+          if (acceptReference(url)) {
+            return Integer.parseInt(System.getProperty("crawl-download-delay-seconds", "1"))
+                * 1000L;
+          } else {
+            return 0;
+          }
+        }
+      };
+
   private final GenericHttpFetcher modifiedHttpFetcher =
       new GenericHttpFetcher() {
         @Override
         public boolean accept(final Doc doc, final HttpMethod httpMethod) {
-
           // Done because already queued docs don't go through ref filter again
           // And if we have already hit the limit, why fetch queued docs
           if (httpMethod == HttpMethod.HEAD && doc.getReference() != null) {
@@ -93,6 +116,8 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
 
     this.limit = limit;
     this.dataSource = dataSource;
+
+    this.delayResolver.setScope(AbstractDelayResolver.SCOPE_SITE);
 
     restoreCount();
   }
@@ -253,6 +278,10 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
         throw new RuntimeException(e);
       }
     }
+  }
+
+  public IDelayResolver delayResolver() {
+    return this.delayResolver;
   }
 
   private static String removeScheme(final URI uri) {
