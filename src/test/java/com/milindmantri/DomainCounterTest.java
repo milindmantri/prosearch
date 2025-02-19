@@ -266,8 +266,8 @@ class DomainCounterTest {
 
     assertTrue(
         IntStream.range(0, 3)
-            .mapToObj(i -> dc.acceptReference("http://host.com/%d".formatted(i)))
-            .allMatch(b -> b));
+            .mapToObj("http://host.com/%d"::formatted)
+            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
 
     assertFalse(dc.acceptReference("http://host.com/4"));
   }
