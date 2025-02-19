@@ -24,10 +24,13 @@ public class SearchPage {
       font-size: 18px;
     }
 
+    form {
+      margin-bottom: 1rem;
+    }
+
     form input {
       font-size: 1.2rem;
       padding: 0.5rem;
-      margin-bottom: 1rem;
     }
 
     form input[type="text"] {
@@ -45,7 +48,7 @@ public class SearchPage {
 
     section div h3 {
       font-size: 120%;
-      margin-bottom: 0.5rem;
+      margin: 0.5rem 0;
     }
 
     section div p {
@@ -109,6 +112,10 @@ public class SearchPage {
 
     if (!this.searchTerm.isBlank()) {
 
+      builder.add(
+          Html.pStrong(
+              "Search latency: %.3fms".formatted(this.results.latency().toNanos() / 1_000_000.0)));
+
       var maybeResults = this.results.results();
       if (maybeResults.isPresent()) {
 
@@ -120,10 +127,6 @@ public class SearchPage {
       }
 
       builder.add(new VoidTag("hr"));
-
-      builder.add(
-          Html.pStrong(
-              "Search latency: %.3fms".formatted(this.results.latency().toNanos() / 1_000_000.0)));
     }
 
     builder.add(
