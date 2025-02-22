@@ -158,12 +158,7 @@ public class TantivyCommitter extends AbstractCommitter {
     try (var con = this.datasource.getConnection();
         var ps =
             con.prepareStatement("INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
-      ps.setString(
-          1,
-          "%s://%s"
-              .formatted(
-                  Objects.requireNonNull(uri.getScheme()),
-                  Objects.requireNonNull(uri.getAuthority())));
+      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
 
       ps.setString(2, uri.toString());
       ps.setLong(3, length);
@@ -174,12 +169,7 @@ public class TantivyCommitter extends AbstractCommitter {
   private void deleteFromDomainStats(final URI uri) throws SQLException {
     try (var con = this.datasource.getConnection();
         var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
-      ps.setString(
-          1,
-          "%s://%s"
-              .formatted(
-                  Objects.requireNonNull(uri.getScheme()),
-                  Objects.requireNonNull(uri.getAuthority())));
+      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
 
       ps.setString(2, uri.toString());
       ps.executeUpdate();
