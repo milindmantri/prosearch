@@ -108,10 +108,20 @@ public class Main {
   }
 
   static com.norconex.commons.lang.map.Properties dbProps() {
+
+    final String dbName = System.getProperty("db-name");
+    final String user = System.getProperty("db-user");
+    final String pass = System.getProperty("db-pass");
+
+    if (dbName == null || user == null || pass == null) {
+      throw new IllegalArgumentException(
+          "Properties 'db-name', 'db-user', 'db-pass' must be set and not null.");
+    }
+
     var props = new HashMap<String, List<String>>();
-    props.put("jdbcUrl", List.of("jdbc:postgresql://localhost:5432/milind"));
-    props.put("username", List.of("postgres"));
-    props.put("password", List.of("pass"));
+    props.put("jdbcUrl", List.of("jdbc:postgresql://localhost:5432/" + dbName));
+    props.put("username", List.of(user));
+    props.put("password", List.of(pass));
 
     return new com.norconex.commons.lang.map.Properties(props);
   }
