@@ -7,6 +7,7 @@ import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.collector.http.link.impl.HtmlLinkExtractor;
 import com.norconex.collector.http.url.IURLNormalizer;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
+import com.norconex.commons.lang.unit.DataUnit;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,6 +45,18 @@ public final class CrawlerRunner implements Runnable {
     config.setId(System.getProperty("collector-id", "ps"));
 
     HttpCrawlerConfig crawlerConfig = new HttpCrawlerConfig();
+    int mmi =
+        DataUnit.MB
+            .toBytes(Integer.parseInt(System.getProperty("crwlr-max-memory-inst", "50")))
+            .intValue();
+    int mmp =
+        DataUnit.MB
+            .toBytes(Integer.parseInt(System.getProperty("crwlr-max-memory-pool", "500")))
+            .intValue();
+
+    config.setMaxMemoryInstance(mmi);
+
+    config.setMaxMemoryPool(mmp);
 
     // TODO: Delete orphan URLs and spoiled refs
 
