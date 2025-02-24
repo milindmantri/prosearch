@@ -284,7 +284,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return this.delayResolver;
   }
 
-  private static String removeScheme(final URI uri) {
+  public static String removeScheme(final URI uri) {
     var sb = new StringBuilder();
     sb.append(uri.getRawAuthority());
     if (uri.getRawPath() != null) {

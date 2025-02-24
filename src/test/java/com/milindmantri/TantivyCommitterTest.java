@@ -290,8 +290,8 @@ class TantivyCommitterTest {
 
       var rs = ps.executeQuery();
       assertTrue(rs.next());
-      assertEquals("http://example.com", rs.getString(1));
-      assertEquals("http://example.com/hello-world", rs.getString(2));
+      assertEquals("example.com", rs.getString(1));
+      assertEquals("example.com/hello-world", rs.getString(2));
       assertEquals(6, rs.getLong(3));
 
       assertFalse(rs.next());
@@ -314,7 +314,7 @@ class TantivyCommitterTest {
           .executeUpdate(
               """
               INSERT INTO domain_stats (host, url, length)
-              VALUES ('http://example.com', 'http://example.com/hello-world', 7)
+              VALUES ('example.com', 'example.com/hello-world', 7)
               """);
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
@@ -329,8 +329,8 @@ class TantivyCommitterTest {
 
       var rs = ps.executeQuery();
       assertTrue(rs.next());
-      assertEquals("http://example.com", rs.getString(1));
-      assertEquals("http://example.com/hello-world", rs.getString(2));
+      assertEquals("example.com", rs.getString(1));
+      assertEquals("example.com/hello-world", rs.getString(2));
       assertEquals(6, rs.getLong(3));
       assertFalse(rs.next());
     }
@@ -350,7 +350,7 @@ class TantivyCommitterTest {
           .executeUpdate(
               """
           INSERT INTO domain_stats (host, url, length)
-          VALUES ('http://example.com', 'http://example.com/hello-world', 7)
+          VALUES ('example.com', 'example.com/hello-world', 7)
           """);
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
