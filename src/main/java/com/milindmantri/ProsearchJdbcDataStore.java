@@ -101,7 +101,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   @Override
   public Optional<T> find(String id) {
     return executeRead(
-        "SELECT id, json FROM <table> WHERE id = ?",
+        "SELECT id, json FROM <table> WHERE id = ? LIMIT 1",
         stmt -> stmt.setString(1, adapter.serializableId(id)),
         this::firstObject);
   }
@@ -109,7 +109,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   @Override
   public Optional<T> findFirst() {
     return executeRead(
-        "SELECT id, json FROM <table> ORDER BY modified", NO_ARGS, this::firstObject);
+        "SELECT id, json FROM <table> ORDER BY modified LIMIT 1", NO_ARGS, this::firstObject);
   }
 
   @Override
@@ -144,7 +144,8 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   @Override
   public Optional<T> deleteFirst() {
     ProsearchJdbcDataStore.Record<T> rec =
-        executeRead("SELECT id, json FROM <table> ORDER BY modified", NO_ARGS, this::firstRecord);
+        executeRead(
+            "SELECT id, json FROM <table> ORDER BY modified LIMIT 1", NO_ARGS, this::firstRecord);
     if (!rec.isEmpty()) {
       delete(rec.id);
     }
@@ -180,7 +181,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
 
   @Override
   public boolean isEmpty() {
-    return executeRead("SELECT * FROM <table>", NO_ARGS, (rs) -> !rs.next());
+    return executeRead("SELECT * FROM <table> LIMIT 1", NO_ARGS, (rs) -> !rs.next());
   }
 
   private void createTable() {
