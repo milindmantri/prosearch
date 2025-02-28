@@ -13,11 +13,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Main {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
   private static final String CREATE_DOMAIN_STATS_TABLE =
       """
@@ -62,8 +67,9 @@ public class Main {
                   .build(),
               URI.create(System.getProperty("tantivy-server", "http://localhost:3000")));
 
-      crawlerScheduler.scheduleWithFixedDelay(
-          new CrawlerRunner(dataSource, client), 0, delayBetweenRuns, TimeUnit.HOURS);
+      Future<?> crawlerFuture =
+          crawlerScheduler.scheduleWithFixedDelay(
+              new CrawlerRunner(dataSource, client), 0, delayBetweenRuns, TimeUnit.HOURS);
 
       int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
 
@@ -71,7 +77,11 @@ public class Main {
 
       httpServer.start();
 
-      Thread.currentThread().join();
+      try {
+        crawlerFuture.get();
+      } catch (Exception e) {
+        LOGGER.error("Crawler failed to run.", e);
+      }
     }
   }
 
