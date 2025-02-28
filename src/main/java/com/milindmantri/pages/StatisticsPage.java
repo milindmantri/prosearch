@@ -2,7 +2,6 @@ package com.milindmantri.pages;
 
 import com.milindmantri.Html;
 import com.milindmantri.StatisticsHttpHandler;
-import com.milindmantri.TantivyClient;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -89,10 +88,5 @@ public class StatisticsPage {
         .add(Html.table(tHead, tbody));
 
     return Html.body(builder.build());
-  }
-
-  private static Html divFromSearchResult(final TantivyClient.SearchResult res) {
-    return Html.div(
-        Stream.of(Html.a(res.url(), true, Stream.of(Html.h3(res.title()))), Html.p(res.snippet())));
   }
 }
