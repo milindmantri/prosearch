@@ -8,7 +8,6 @@ import com.norconex.committer.core3.CommitterException;
 import com.norconex.committer.core3.DeleteRequest;
 import com.norconex.committer.core3.UpsertRequest;
 import com.norconex.commons.lang.map.Properties;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -27,10 +26,7 @@ import org.mockito.Mockito;
 
 class TantivyCommitterTest {
 
-  // NOTE: Ensure PG is running on local and "test" DB exists.
-
-  private static final HikariDataSource datasource =
-      new HikariDataSource(new HikariConfig(dbProps()));
+  private static final HikariDataSource datasource = TestCommons.createTestDataSource();
 
   @Test
   void doUpsert() throws CommitterException, IOException, InterruptedException {
@@ -399,14 +395,5 @@ class TantivyCommitterTest {
         var ps = con.prepareStatement("DROP TABLE IF EXISTS domain_stats")) {
       ps.executeUpdate();
     }
-  }
-
-  private static java.util.Properties dbProps() {
-    var props = new java.util.Properties();
-    props.put("jdbcUrl", "jdbc:postgresql://localhost:5432/test");
-    props.put("username", "postgres");
-    props.put("password", "pass");
-
-    return props;
   }
 }

@@ -9,7 +9,6 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -22,7 +21,7 @@ class DomainCounterTest {
   // NOTE: Ensure PG is running on local and "test" DB exists.
 
   private static final HikariDataSource datasource =
-      new HikariDataSource(new HikariConfig(dbProps()));
+    TestCommons.createTestDataSource();
 
   private static final String DROP_TABLE =
       """
@@ -270,14 +269,5 @@ class DomainCounterTest {
             .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
 
     assertFalse(dc.acceptReference("http://host.com/4"));
-  }
-
-  private static Properties dbProps() {
-    var props = new Properties();
-    props.put("jdbcUrl", "jdbc:postgresql://localhost:5432/test");
-    props.put("username", "postgres");
-    props.put("password", "pass");
-
-    return props;
   }
 }

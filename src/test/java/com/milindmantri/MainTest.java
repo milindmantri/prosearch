@@ -3,7 +3,6 @@ package com.milindmantri;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.sun.net.httpserver.HttpServer;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -14,7 +13,6 @@ import java.net.http.HttpResponse;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -26,8 +24,7 @@ class MainTest {
 
   // NOTE: Ensure PG is running on local and "test" DB exists.
 
-  private static final HikariDataSource datasource =
-      new HikariDataSource(new HikariConfig(dbProps()));
+  private static final HikariDataSource datasource = TestCommons.createTestDataSource();
 
   private static final TantivyClient.SearchResultWithLatency SAMPLE_RESPONSE_OBJ =
       new TantivyClient.SearchResultWithLatency(
@@ -123,14 +120,5 @@ class MainTest {
 
       assertDoesNotThrow(() -> ps.executeUpdate());
     }
-  }
-
-  private static Properties dbProps() {
-    var props = new Properties();
-    props.put("jdbcUrl", "jdbc:postgresql://localhost:5432/test");
-    props.put("username", "postgres");
-    props.put("password", "pass");
-
-    return props;
   }
 }
