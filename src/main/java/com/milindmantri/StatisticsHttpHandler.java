@@ -12,16 +12,19 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public record StatisticsHttpHandler(DataSource datasource) implements HttpHandler {
+public record StatisticsHttpHandler(DataSource datasource, Stream<String> startHosts)
+    implements HttpHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StatisticsHttpHandler.class);
 
-  private static final String GET_STATS_QUERY =
+  static final String GET_STATS_QUERY =
       """
     SELECT
         host
@@ -31,6 +34,8 @@ public record StatisticsHttpHandler(DataSource datasource) implements HttpHandle
       domain_stats
     GROUP BY
       host
+    ORDER BY
+      urls DESC
     """;
 
   public static final String STATISTICS_PAGE_PATH = "/stats/";
@@ -82,16 +87,22 @@ public record StatisticsHttpHandler(DataSource datasource) implements HttpHandle
     }
   }
 
-  private static Stream<Stat> getSummary(final ResultSet rs) throws SQLException {
+  // for testing
+  Stream<Stat> getSummary(final ResultSet rs) throws SQLException {
     Stream.Builder<Stat> builder = Stream.builder();
+    Set<String> zeroCrawls = this.startHosts.collect(Collectors.toSet());
 
     while (rs.next()) {
       String domain = rs.getString("host");
+      zeroCrawls.remove(domain);
+
       int count = rs.getInt("urls");
       String size = rs.getString("size");
 
       builder.accept(new Stat(domain, count, size));
     }
+
+    zeroCrawls.stream().map(s -> new Stat(s, 0, "-")).forEach(builder);
 
     return builder.build();
   }

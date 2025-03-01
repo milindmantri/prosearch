@@ -53,7 +53,7 @@ class MainTest {
     TantivyClient tantivy = Mockito.mock(TantivyClient.class);
     Mockito.when(tantivy.search("hello")).thenReturn(SAMPLE_RESPONSE_OBJ);
 
-    HttpServer httpServer = Main.httpServer(0, tantivy, datasource);
+    HttpServer httpServer = Main.httpServer(0, tantivy, datasource, Stream.of());
     httpServer.start();
     HttpClient client = HttpClient.newHttpClient();
     HttpResponse<String> res =
@@ -78,7 +78,7 @@ class MainTest {
     Mockito.when(tantivy.search("hello"))
         .thenThrow(new TantivyClient.FailedSearchException("search-err"));
 
-    HttpServer httpServer = Main.httpServer(0, tantivy, datasource);
+    HttpServer httpServer = Main.httpServer(0, tantivy, datasource, Stream.of());
     httpServer.start();
     HttpClient client = HttpClient.newHttpClient();
     HttpResponse<String> res =

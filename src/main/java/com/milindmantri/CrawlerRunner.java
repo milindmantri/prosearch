@@ -8,11 +8,9 @@ import com.norconex.collector.http.link.impl.HtmlLinkExtractor;
 import com.norconex.collector.http.url.IURLNormalizer;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.unit.DataUnit;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 
 public final class CrawlerRunner implements Runnable {
@@ -24,8 +22,10 @@ public final class CrawlerRunner implements Runnable {
 
   private final DataSource datasource;
   private final TantivyClient client;
+  private final List<String> startUrls;
 
-  public CrawlerRunner(final DataSource datasource, final TantivyClient client) {
+  public CrawlerRunner(
+      final DataSource datasource, final TantivyClient client, final Stream<String> startUrls) {
     if (datasource == null) {
       throw new IllegalArgumentException("datasource must not be null.");
     }
@@ -34,8 +34,13 @@ public final class CrawlerRunner implements Runnable {
       throw new IllegalArgumentException("client must not be null.");
     }
 
+    if (startUrls == null) {
+      throw new IllegalArgumentException("startUrls must not be null.");
+    }
+
     this.client = client;
     this.datasource = datasource;
+    this.startUrls = startUrls.toList();
   }
 
   @Override
@@ -62,17 +67,7 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setUrlNormalizer(URL_NORMALIZER);
 
-    // TODO: pass list of all URLs to crawl
-    ClassLoader classloader = Thread.currentThread().getContextClassLoader();
-    try (InputStream is = classloader.getResourceAsStream("start-urls");
-        var isr = new InputStreamReader(is);
-        var reader = new BufferedReader(isr)) {
-
-      crawlerConfig.setStartURLs(reader.lines().toList());
-
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    crawlerConfig.setStartURLs(this.startUrls);
 
     crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
 

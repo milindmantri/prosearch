@@ -3,7 +3,10 @@ package com.milindmantri;
 import com.sun.net.httpserver.HttpServer;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -11,11 +14,14 @@ import java.net.http.HttpClient;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,8 +53,20 @@ public class Main {
   public static void main(String[] args)
       throws SQLException, ExecutionException, InterruptedException, IOException {
 
+    ClassLoader classloader = Thread.currentThread().getContextClassLoader();
     try (var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()));
         ScheduledExecutorService crawlerScheduler = Executors.newSingleThreadScheduledExecutor()) {
+
+      Set<String> startUrls;
+      try (InputStream is = classloader.getResourceAsStream("start-urls");
+          var isr = new InputStreamReader(is);
+          var reader = new BufferedReader(isr)) {
+
+        startUrls = reader.lines().collect(Collectors.toSet());
+
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
 
       if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
         dropStatsTable(dataSource);
@@ -69,11 +87,14 @@ public class Main {
 
       Future<?> crawlerFuture =
           crawlerScheduler.scheduleWithFixedDelay(
-              new CrawlerRunner(dataSource, client), 0, delayBetweenRuns, TimeUnit.HOURS);
+              new CrawlerRunner(dataSource, client, startUrls.stream()),
+              0,
+              delayBetweenRuns,
+              TimeUnit.HOURS);
 
       int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
 
-      HttpServer httpServer = httpServer(httpPort, client, dataSource);
+      HttpServer httpServer = httpServer(httpPort, client, dataSource, startUrls.stream());
 
       httpServer.start();
 
@@ -86,14 +107,18 @@ public class Main {
   }
 
   static HttpServer httpServer(
-      final int port, final TantivyClient tantivyClient, final DataSource datasource)
+      final int port,
+      final TantivyClient tantivyClient,
+      final DataSource datasource,
+      final Stream<String> startUrls)
       throws IOException {
     HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
     httpServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
     httpServer.createContext("/search/", new SearchHttpHandler(tantivyClient));
     httpServer.createContext(
-        StatisticsHttpHandler.STATISTICS_PAGE_PATH, new StatisticsHttpHandler(datasource));
+        StatisticsHttpHandler.STATISTICS_PAGE_PATH,
+        new StatisticsHttpHandler(datasource, startUrls));
     return httpServer;
   }
 
@@ -111,7 +136,7 @@ public class Main {
     }
   }
 
-  private static void dropStatsTable(final DataSource datasource) throws SQLException {
+  static void dropStatsTable(final DataSource datasource) throws SQLException {
     try (var con = datasource.getConnection()) {
       con.createStatement().executeUpdate("DROP TABLE IF EXISTS domain_stats");
     }
