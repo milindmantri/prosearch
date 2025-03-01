@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.norconex.collector.core.crawler.Crawler;
 import com.norconex.collector.core.crawler.CrawlerEvent;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.util.List;
@@ -20,8 +19,7 @@ class DomainCounterTest {
 
   // NOTE: Ensure PG is running on local and "test" DB exists.
 
-  private static final HikariDataSource datasource =
-    TestCommons.createTestDataSource();
+  private static final HikariDataSource datasource = TestCommons.createTestDataSource();
 
   private static final String DROP_TABLE =
       """

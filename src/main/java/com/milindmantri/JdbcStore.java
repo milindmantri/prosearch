@@ -36,6 +36,7 @@ public class JdbcStore<T> implements IDataStore<T> {
           .create();
 
   private static final JdbcStore.PreparedStatementConsumer NO_ARGS = stmt -> {};
+  static final String QUEUED_STORE = "queued";
 
   private final JdbcStoreEngine engine;
   private String tableName;
@@ -79,21 +80,31 @@ public class JdbcStore<T> implements IDataStore<T> {
             + "    CAST(? AS "
             + adapter.jsonType()
             + ") AS json "
+            + (isQueued() ? ", CAST(? AS VARCHAR) AS host" : "")
             // https://wiki.postgresql.org/wiki/Oracle_to_Postgres_Conversion#The_Dual_Table
             // + "  FROM DUAL"
             + ") AS s "
             + "  ON t.id = s.id "
             + "WHEN NOT MATCHED THEN "
-            + "  INSERT (id, modified, json) "
-            + "  VALUES (s.id, s.modified, s.json) "
+            + "  INSERT (id, modified, "
+            + (isQueued() ? "host, " : "")
+            + "json) "
+            + "  VALUES (s.id, s.modified, "
+            + (isQueued() ? "s.host, " : "")
+            + "s.json) "
             + "WHEN MATCHED THEN "
             + "  UPDATE SET "
             + "    modified = s.modified, "
             + "    json = s.json ",
         stmt -> {
-          stmt.setString(1, adapter.serializableId(id));
+          String idValue = adapter.serializableId(id);
+          stmt.setString(1, idValue);
           stmt.setTimestamp(2, new Timestamp(currentTimeMillis()));
           stmt.setString(3, GSON.toJson(object));
+
+          if (isQueued()) {
+            stmt.setString(4, DomainCounter.removeHost(idValue));
+          }
         });
   }
 
@@ -193,6 +204,7 @@ public class JdbcStore<T> implements IDataStore<T> {
                 + "id "
                 + adapter.idType()
                 + " NOT NULL, "
+                + (isQueued() ? "host VARCHAR NOT NULL, " : "")
                 + "modified "
                 + adapter.modifiedType()
                 + ", "
@@ -203,6 +215,18 @@ public class JdbcStore<T> implements IDataStore<T> {
                 + ")");
         stmt.executeUpdate(
             "CREATE INDEX " + tableName + "_modified_index " + "ON " + tableName + "(modified)");
+
+        // fast index for polling queues
+        if (isQueued()) {
+          stmt.executeUpdate(
+              "CREATE INDEX "
+                  + tableName
+                  + "_host_modified_index "
+                  + "ON "
+                  + tableName
+                  + "(host, modified ASC)");
+        }
+
         if (!conn.getAutoCommit()) {
           conn.commit();
         }
@@ -315,5 +339,9 @@ public class JdbcStore<T> implements IDataStore<T> {
     private boolean isEmpty() {
       return id == null;
     }
+  }
+
+  private boolean isQueued() {
+    return QUEUED_STORE.equals(this.storeName);
   }
 }

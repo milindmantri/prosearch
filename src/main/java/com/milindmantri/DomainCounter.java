@@ -299,6 +299,10 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return sb.toString();
   }
 
+  public static String removeHost(final String validUri) {
+    return URI.create(validUri).getRawAuthority();
+  }
+
   private static List<IMetadataFilter> getTextOnlyMetadataFilters() {
     return Stream.of("text/html", "application/xhtml+xml", "text/plain")
         .map(t -> t + "*")

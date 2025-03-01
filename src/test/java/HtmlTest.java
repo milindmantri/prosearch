@@ -53,8 +53,7 @@ class HtmlTest {
 
   @Test
   void divBr() {
-    Html div =
-        new Html.Tag("div", Map.of("id", "div-id"), Stream.of(new Html.VoidTag("br")));
+    Html div = new Html.Tag("div", Map.of("id", "div-id"), Stream.of(new Html.VoidTag("br")));
     assertEquals(
         """
   <div
@@ -73,8 +72,7 @@ class HtmlTest {
         new Html.Tag(
             "div",
             Map.of("id", "div-id"),
-            Stream.of(
-                new Html.VoidTag("br"), new Html.Tag("div", Map.of("id", "inner-div"))));
+            Stream.of(new Html.VoidTag("br"), new Html.Tag("div", Map.of("id", "inner-div"))));
     assertEquals(
         """
       <div
