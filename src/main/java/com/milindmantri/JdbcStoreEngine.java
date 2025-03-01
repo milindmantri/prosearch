@@ -68,9 +68,9 @@ import org.slf4j.LoggerFactory;
  * @author Pascal Essiembre (original author)
  *     <p>This is a copy of JdbcDataStoreEngine edited to make things work with postgres
  */
-public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfigurable {
+public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ProsearchJdbcDataStoreEngine.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JdbcStoreEngine.class);
 
   private static final String STORE_TYPES_NAME = "_storetypes";
 
@@ -78,7 +78,7 @@ public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfi
   private HikariDataSource datasource;
   private String tablePrefix;
   // table id field is store name
-  private ProsearchJdbcDataStore<String> storeTypes;
+  private JdbcStore<String> storeTypes;
   private ProsearchTableAdapter tableAdapter;
 
   // Configurable:
@@ -141,7 +141,7 @@ public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfi
     tableAdapter = resolveTableAdapter();
 
     // store types for each table
-    storeTypes = new ProsearchJdbcDataStore<>(this, STORE_TYPES_NAME, String.class);
+    storeTypes = new JdbcStore<>(this, STORE_TYPES_NAME, String.class);
   }
 
   private ProsearchTableAdapter resolveTableAdapter() {
@@ -180,7 +180,7 @@ public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfi
   @Override
   public <T> IDataStore<T> openStore(String storeName, Class<? extends T> type) {
     storeTypes.save(storeName, type.getName());
-    return new ProsearchJdbcDataStore<>(this, storeName, type);
+    return new JdbcStore<>(this, storeName, type);
   }
 
   @Override
@@ -210,9 +210,9 @@ public class ProsearchJdbcDataStoreEngine implements IDataStoreEngine, IXMLConfi
 
   @Override
   public boolean renameStore(IDataStore<?> dataStore, String newStoreName) {
-    ProsearchJdbcDataStore<?> jdbcStore = (ProsearchJdbcDataStore<?>) dataStore;
+    JdbcStore<?> jdbcStore = (JdbcStore<?>) dataStore;
     String oldStoreName = jdbcStore.getName();
-    boolean existed = ((ProsearchJdbcDataStore<?>) dataStore).rename(newStoreName);
+    boolean existed = ((JdbcStore<?>) dataStore).rename(newStoreName);
     storeTypes.delete(oldStoreName);
     storeTypes.save(newStoreName, jdbcStore.getType().getName());
     return existed;

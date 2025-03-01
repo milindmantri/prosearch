@@ -26,7 +26,7 @@ import java.util.function.BiPredicate;
  *
  * @param <T>
  */
-public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
+public class JdbcStore<T> implements IDataStore<T> {
 
   // Used to parse HttpDocInfo
   private static final Gson GSON =
@@ -35,16 +35,15 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
           .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeTypeAdapter())
           .create();
 
-  private static final ProsearchJdbcDataStore.PreparedStatementConsumer NO_ARGS = stmt -> {};
+  private static final JdbcStore.PreparedStatementConsumer NO_ARGS = stmt -> {};
 
-  private final ProsearchJdbcDataStoreEngine engine;
+  private final JdbcStoreEngine engine;
   private String tableName;
   private String storeName;
   private final Class<? extends T> type;
   private final ProsearchTableAdapter adapter;
 
-  ProsearchJdbcDataStore(
-      ProsearchJdbcDataStoreEngine engine, String storeName, Class<? extends T> type) {
+  JdbcStore(JdbcStoreEngine engine, String storeName, Class<? extends T> type) {
     super();
     this.engine = requireNonNull(engine, "'engine' must not be null.");
     this.type = requireNonNull(type, "'type' must not be null.");
@@ -143,7 +142,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
 
   @Override
   public Optional<T> deleteFirst() {
-    ProsearchJdbcDataStore.Record<T> rec =
+    JdbcStore.Record<T> rec =
         executeRead(
             "SELECT id, json FROM <table> ORDER BY modified LIMIT 1", NO_ARGS, this::firstRecord);
     if (!rec.isEmpty()) {
@@ -170,7 +169,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
         NO_ARGS,
         rs -> {
           while (rs.next()) {
-            ProsearchJdbcDataStore.Record<T> rec = toRecord(rs);
+            JdbcStore.Record<T> rec = toRecord(rs);
             if (!predicate.test(rec.id, rec.object.get())) {
               return false;
             }
@@ -236,19 +235,19 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
     }
   }
 
-  private ProsearchJdbcDataStore.Record<T> firstRecord(ResultSet rs) {
+  private JdbcStore.Record<T> firstRecord(ResultSet rs) {
     try {
       if (rs.first()) {
         return toRecord(rs);
       }
-      return new ProsearchJdbcDataStore.Record<>();
+      return new JdbcStore.Record<>();
     } catch (IOException | SQLException e) {
       throw new DataStoreException("Could not get record from table '" + tableName + "'.", e);
     }
   }
 
-  private ProsearchJdbcDataStore.Record<T> toRecord(ResultSet rs) throws IOException, SQLException {
-    ProsearchJdbcDataStore.Record<T> rec = new ProsearchJdbcDataStore.Record<>();
+  private JdbcStore.Record<T> toRecord(ResultSet rs) throws IOException, SQLException {
+    JdbcStore.Record<T> rec = new JdbcStore.Record<>();
     rec.id = rs.getString(1);
     rec.object = toObject(rs.getString(2));
     return rec;
@@ -263,9 +262,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
   }
 
   private <R> R executeRead(
-      String sql,
-      ProsearchJdbcDataStore.PreparedStatementConsumer psc,
-      ProsearchJdbcDataStore.ResultSetFunction<R> rsc) {
+      String sql, JdbcStore.PreparedStatementConsumer psc, JdbcStore.ResultSetFunction<R> rsc) {
     try (Connection conn = engine.getConnection()) {
       try (PreparedStatement stmt =
           conn.prepareStatement(
@@ -283,7 +280,7 @@ public class ProsearchJdbcDataStore<T> implements IDataStore<T> {
     }
   }
 
-  private int executeWrite(String sql, ProsearchJdbcDataStore.PreparedStatementConsumer c) {
+  private int executeWrite(String sql, JdbcStore.PreparedStatementConsumer c) {
     try (Connection conn = engine.getConnection()) {
       try (PreparedStatement stmt = conn.prepareStatement(sql.replace("<table>", tableName))) {
         c.accept(stmt);

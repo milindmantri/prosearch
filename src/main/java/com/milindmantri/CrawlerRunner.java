@@ -83,7 +83,7 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setFetchHttpHead(true);
     crawlerConfig.setIgnoreSitemap(true);
 
-    try (ProsearchJdbcDataStoreEngine engine = new ProsearchJdbcDataStoreEngine()) {
+    try (JdbcStoreEngine engine = new JdbcStoreEngine()) {
 
       engine.setConfigProperties(Main.dbProps());
       crawlerConfig.setDataStoreEngine(engine);
