@@ -103,7 +103,7 @@ public class JdbcStore<T> implements IDataStore<T> {
           stmt.setString(3, GSON.toJson(object));
 
           if (isQueued()) {
-            stmt.setString(4, DomainCounter.removeHost(idValue));
+            stmt.setString(4, DomainCounter.getHost(idValue));
           }
         });
   }

@@ -21,8 +21,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.PrimitiveIterator;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
@@ -61,7 +65,12 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
   private final Map<String, AtomicInteger> count = new ConcurrentHashMap<>();
 
   private final DataSource dataSource;
+  // TODO: make final
+  private final Set<String> notQueuedHosts = ConcurrentHashMap.newKeySet();
+  private String[] startUrls;
+  private PrimitiveIterator.OfInt nextHostIndex;
 
+  // TODO: Add custom first stage which rejects in importer pipeline and remove delay resolver
   private final GenericDelayResolver delayResolver =
       new GenericDelayResolver() {
         @Override
@@ -120,6 +129,16 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     this.delayResolver.setScope(AbstractDelayResolver.SCOPE_SITE);
 
     restoreCount();
+  }
+
+  /** Caller is responsible for closing dataSource */
+  public DomainCounter(final int limit, final DataSource dataSource, final Stream<String> startUrls)
+      throws SQLException {
+    this(limit, dataSource);
+
+    this.startUrls = startUrls.map(DomainCounter::getHost).toArray(String[]::new);
+    // infinite stream over index
+    this.nextHostIndex = IntStream.iterate(0, i -> (i + 1) % this.startUrls.length).iterator();
   }
 
   @Override
@@ -196,6 +215,10 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
+    } else if (event instanceof CrawlerEvent ce && ce.is(CrawlerEvent.DOCUMENT_QUEUED)) {
+      // host has been queued, remove from not queued hosts if it exists there.
+      String host = getHost(ce.getCrawlDocInfo().getReference());
+      this.notQueuedHosts.remove(host);
     }
   }
 
@@ -211,18 +234,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     // ref is already normalized
     final URI uri = URI.create(normalized);
     final String host = uri.getRawAuthority();
-    if (count.containsKey(host)) {
-      AtomicInteger i = count.get(host);
-
-      if (i.get() >= limit) {
-        LOGGER.info("Filtered by reference: host {}, ref {}", host, reference);
-        return false;
-      } else {
-        return true;
-      }
-    } else {
-      return true;
-    }
+    return acceptHost(host);
   }
 
   public IHttpFetcher httpFetcher() {
@@ -299,7 +311,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return sb.toString();
   }
 
-  public static String removeHost(final String validUri) {
+  public static String getHost(final String validUri) {
     return URI.create(validUri).getRawAuthority();
   }
 
@@ -314,5 +326,55 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
                   new MetadataFilter(TextMatcher.basic("content-type"), TextMatcher.wildcard(t)));
             })
         .toList();
+  }
+
+  public boolean isCrawledOnce(String host) {
+    return this.count.containsKey(host);
+  }
+
+  private boolean acceptHost(String host) {
+    if (isCrawledOnce(host)) {
+      AtomicInteger i = count.get(host);
+
+      return i.get() < limit;
+    } else {
+      return true;
+    }
+  }
+
+  /** Helper to get next host to pull entry from queue */
+  public Optional<String> getNextHost() {
+
+    if (this.nextHostIndex.hasNext()) {
+
+      String host = null;
+      int firstIndex = -1;
+
+      do {
+        int i = this.nextHostIndex.nextInt();
+
+        if (host == null) {
+          firstIndex = i;
+        } else if (i == firstIndex) {
+          // all urls exhausted
+          return Optional.empty();
+        }
+
+        host = this.startUrls[i];
+      } while (!(isCrawledOnce(host) && acceptHost(host) && maybeQueued(host))
+          && this.nextHostIndex.hasNext());
+
+      return Optional.of(host);
+    }
+    return Optional.empty();
+  }
+
+  private boolean maybeQueued(final String host) {
+    return !this.notQueuedHosts.contains(host);
+  }
+
+  /** Call when host is not found when looking in queue */
+  public void notQueued(final String host) {
+    this.notQueuedHosts.add(host);
   }
 }

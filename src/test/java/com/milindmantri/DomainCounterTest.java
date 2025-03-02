@@ -4,11 +4,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.norconex.collector.core.crawler.Crawler;
 import com.norconex.collector.core.crawler.CrawlerEvent;
+import com.norconex.collector.core.doc.CrawlDocInfo;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -267,5 +270,92 @@ class DomainCounterTest {
             .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
 
     assertFalse(dc.acceptReference("http://host.com/4"));
+  }
+
+  @Test
+  void getNextHost() throws SQLException {
+    DomainCounter dc =
+        new DomainCounter(3, datasource, Stream.of("http://site1.com", "https://site2.com"));
+
+    assertTrue(dc.getNextHost().isEmpty());
+  }
+
+  @Test
+  void getNextHostVisitedOnce() throws SQLException {
+    DomainCounter dc =
+        new DomainCounter(3, datasource, Stream.of("http://site1.com", "https://site2.com"));
+
+    assertTrue(
+        IntStream.range(0, 2)
+            .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
+            .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
+            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+
+    assertEquals("site1.com", dc.getNextHost().get());
+    assertEquals("site2.com", dc.getNextHost().get());
+    assertEquals("site1.com", dc.getNextHost().get());
+  }
+
+  @Test
+  void getNextHostLimitReached() throws SQLException {
+    DomainCounter dc =
+        new DomainCounter(3, datasource, Stream.of("http://site1.com", "https://site2.com"));
+
+    assertTrue(
+        IntStream.range(0, 3)
+            .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
+            .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
+            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+
+    assertTrue(dc.getNextHost().isEmpty());
+  }
+
+  @Test
+  void getNextHostMissedOnce() throws SQLException {
+    DomainCounter dc =
+        new DomainCounter(3, datasource, Stream.of("http://site1.com", "https://site2.com"));
+
+    assertTrue(
+        IntStream.range(0, 2)
+            .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
+            .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
+            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+
+    assertEquals("site1.com", dc.getNextHost().get());
+    assertEquals("site2.com", dc.getNextHost().get());
+
+    dc.notQueued("site1.com");
+
+    assertEquals("site2.com", dc.getNextHost().get());
+    assertEquals("site2.com", dc.getNextHost().get());
+  }
+
+  @Test
+  void getNextHostQueued() throws SQLException {
+    DomainCounter dc =
+        new DomainCounter(3, datasource, Stream.of("http://site1.com", "https://site2.com"));
+
+    assertTrue(
+        IntStream.range(0, 2)
+            .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
+            .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
+            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+
+    assertEquals("site1.com", dc.getNextHost().get());
+    assertEquals("site2.com", dc.getNextHost().get());
+
+    dc.notQueued("site1.com");
+
+    assertEquals("site2.com", dc.getNextHost().get());
+    assertEquals("site2.com", dc.getNextHost().get());
+
+    dc.accept(
+        new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, Mockito.mock(Crawler.class))
+            .crawlDocInfo(new CrawlDocInfo("http://site1.com/123"))
+            .build());
+
+    assertEquals("site1.com", dc.getNextHost().get());
+    assertEquals("site2.com", dc.getNextHost().get());
+    assertEquals("site1.com", dc.getNextHost().get());
   }
 }
