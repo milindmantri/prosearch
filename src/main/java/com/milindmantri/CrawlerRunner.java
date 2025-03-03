@@ -83,35 +83,37 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setFetchHttpHead(true);
     crawlerConfig.setIgnoreSitemap(true);
 
-    try (JdbcStoreEngine engine = new JdbcStoreEngine()) {
-
-      engine.setConfigProperties(Main.dbProps());
-      crawlerConfig.setDataStoreEngine(engine);
-
-      var htmlLinkExtractor = new HtmlLinkExtractor();
-      htmlLinkExtractor.setIgnoreLinkData(true);
-      htmlLinkExtractor.removeLinkTag("img", "src");
-
-      crawlerConfig.setLinkExtractors(htmlLinkExtractor);
-
+    try {
       var domainCounter = new DomainCounter(PER_HOST_CRAWLING_LIMIT, this.datasource);
-      crawlerConfig.setReferenceFilters(domainCounter);
-      crawlerConfig.setEventListeners(domainCounter);
-      crawlerConfig.setMetadataFilters(domainCounter);
-      crawlerConfig.setHttpFetchers(domainCounter.httpFetcher());
-      crawlerConfig.setDelayResolver(domainCounter.delayResolver());
+      try (JdbcStoreEngine engine = new JdbcStoreEngine(domainCounter)) {
 
-      crawlerConfig.setCommitters(new TantivyCommitter(this.client, this.datasource));
+        engine.setConfigProperties(Main.dbProps());
+        crawlerConfig.setDataStoreEngine(engine);
 
-      config.setCrawlerConfigs(crawlerConfig);
+        var htmlLinkExtractor = new HtmlLinkExtractor();
+        htmlLinkExtractor.setIgnoreLinkData(true);
+        htmlLinkExtractor.removeLinkTag("img", "src");
 
-      HttpCollector spider = new HttpCollector(config);
+        crawlerConfig.setLinkExtractors(htmlLinkExtractor);
 
-      if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
-        spider.clean();
+        crawlerConfig.setReferenceFilters(domainCounter);
+        crawlerConfig.setEventListeners(domainCounter);
+        crawlerConfig.setMetadataFilters(domainCounter);
+        crawlerConfig.setHttpFetchers(domainCounter.httpFetcher());
+        crawlerConfig.setDelayResolver(domainCounter.delayResolver());
+
+        crawlerConfig.setCommitters(new TantivyCommitter(this.client, this.datasource));
+
+        config.setCrawlerConfigs(crawlerConfig);
+
+        HttpCollector spider = new HttpCollector(config);
+
+        if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
+          spider.clean();
+        }
+
+        spider.start();
       }
-
-      spider.start();
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }

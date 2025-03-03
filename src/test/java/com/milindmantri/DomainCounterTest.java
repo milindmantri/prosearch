@@ -1,5 +1,6 @@
 package com.milindmantri;
 
+import static com.milindmantri.TestCommons.VALID_PROPS;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.norconex.collector.core.crawler.Crawler;
@@ -30,9 +31,6 @@ class DomainCounterTest {
     """;
 
   private final Crawler mockCrawler = Mockito.mock(Crawler.class);
-
-  private static final com.norconex.commons.lang.map.Properties VALID_PROPS =
-      new com.norconex.commons.lang.map.Properties(Map.of("content-type", List.of("text/html")));
 
   @AfterAll
   static void closeDataSource() {

@@ -43,14 +43,20 @@ public class JdbcStore<T> implements IDataStore<T> {
   private String storeName;
   private final Class<? extends T> type;
   private final ProsearchTableAdapter adapter;
+  private final DomainCounter domainCounter;
 
-  JdbcStore(JdbcStoreEngine engine, String storeName, Class<? extends T> type) {
+  JdbcStore(
+      JdbcStoreEngine engine,
+      String storeName,
+      Class<? extends T> type,
+      final DomainCounter domainCounter) {
     super();
     this.engine = requireNonNull(engine, "'engine' must not be null.");
     this.type = requireNonNull(type, "'type' must not be null.");
     this.adapter = engine.getTableAdapter();
     this.storeName = requireNonNull(storeName, "'storeName' must not be null.");
     this.tableName = engine.tableName(storeName);
+    this.domainCounter = requireNonNull(domainCounter, "domainCounter must not be null.");
     if (!engine.tableExist(tableName)) {
       createTable();
     }
@@ -153,6 +159,37 @@ public class JdbcStore<T> implements IDataStore<T> {
 
   @Override
   public Optional<T> deleteFirst() {
+
+    if (isQueued()) {
+      final Optional<String> next = this.domainCounter.getNextHost();
+      if (next.isPresent()) {
+
+        final String sql = "SELECT id, json FROM <table> WHERE host = ? ORDER BY modified LIMIT 1";
+
+        try (Connection conn = engine.getConnection();
+            PreparedStatement stmt =
+                conn.prepareStatement(
+                    sql.replace("<table>", tableName),
+                    // Requires scrollable type but wasn't set in original store
+                    ResultSet.TYPE_SCROLL_INSENSITIVE,
+                    CONCUR_UPDATABLE)) {
+
+          stmt.setString(1, next.get());
+
+          var rec = firstRecord(stmt.executeQuery());
+          if (!rec.isEmpty()) {
+            delete(rec.id);
+            return rec.object;
+          } else {
+            domainCounter.notQueued(next.get());
+          }
+
+        } catch (SQLException e) {
+          throw new RuntimeException(e);
+        }
+      }
+    }
+
     JdbcStore.Record<T> rec =
         executeRead(
             "SELECT id, json FROM <table> ORDER BY modified LIMIT 1", NO_ARGS, this::firstRecord);

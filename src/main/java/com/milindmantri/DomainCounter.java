@@ -113,6 +113,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
       };
 
   /** Caller is responsible for closing dataSource */
+  @Deprecated(forRemoval = true)
   public DomainCounter(final int limit, final DataSource dataSource) throws SQLException {
     if (limit <= 0) {
       throw new IllegalArgumentException(

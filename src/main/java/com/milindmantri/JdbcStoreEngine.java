@@ -19,6 +19,7 @@ import java.sql.Statement;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.ClassUtils;
@@ -86,6 +87,11 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
   private String varcharType;
   private String timestapType;
   private String textType;
+  private final DomainCounter domainCounter;
+
+  public JdbcStoreEngine(DomainCounter domainCounter) {
+    this.domainCounter = Objects.requireNonNull(domainCounter, "domainCounter must not be null.");
+  }
 
   public Properties getConfigProperties() {
     return configProperties;
@@ -141,7 +147,7 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
     tableAdapter = resolveTableAdapter();
 
     // store types for each table
-    storeTypes = new JdbcStore<>(this, STORE_TYPES_NAME, String.class);
+    storeTypes = new JdbcStore<>(this, STORE_TYPES_NAME, String.class, this.domainCounter);
   }
 
   private ProsearchTableAdapter resolveTableAdapter() {
@@ -180,7 +186,7 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
   @Override
   public <T> IDataStore<T> openStore(String storeName, Class<? extends T> type) {
     storeTypes.save(storeName, type.getName());
-    return new JdbcStore<>(this, storeName, type);
+    return new JdbcStore<>(this, storeName, type, this.domainCounter);
   }
 
   @Override

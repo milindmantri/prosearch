@@ -5,6 +5,8 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import javax.sql.DataSource;
 import org.apache.poi.ss.formula.functions.T;
@@ -12,6 +14,9 @@ import org.apache.poi.ss.formula.functions.T;
 public class TestCommons {
 
   // NOTE: Ensure PG is running on local and "test" DB exists.
+
+  static final com.norconex.commons.lang.map.Properties VALID_PROPS =
+      new com.norconex.commons.lang.map.Properties(Map.of("content-type", List.of("text/html")));
 
   public static HikariDataSource createTestDataSource() {
     return new HikariDataSource(new HikariConfig(TestCommons.dbProps().toProperties()));
