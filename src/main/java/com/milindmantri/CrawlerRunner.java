@@ -84,7 +84,8 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setIgnoreSitemap(true);
 
     try {
-      var domainCounter = new DomainCounter(PER_HOST_CRAWLING_LIMIT, this.datasource);
+      var domainCounter =
+          new DomainCounter(PER_HOST_CRAWLING_LIMIT, this.datasource, this.startUrls.stream());
       try (JdbcStoreEngine engine = new JdbcStoreEngine(domainCounter)) {
 
         engine.setConfigProperties(Main.dbProps());

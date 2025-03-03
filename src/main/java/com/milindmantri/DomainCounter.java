@@ -14,6 +14,7 @@ import com.norconex.collector.http.robot.RobotsTxt;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
 import com.norconex.commons.lang.map.Properties;
+import com.norconex.commons.lang.net.Host;
 import com.norconex.commons.lang.text.TextMatcher;
 import com.norconex.importer.doc.Doc;
 import java.net.URI;
@@ -312,6 +313,22 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return sb.toString();
   }
 
+  public record Host(String host) {
+    public Host {
+      if (host == null || host.isBlank()) {
+        throw new IllegalArgumentException("host must not be null or blank.");
+      }
+
+      // TODO: add host validation
+    }
+  }
+
+  // TODO: Rename
+  public static Host getHostMethod(final String validUri) {
+    return new Host(URI.create(validUri).getRawAuthority());
+  }
+
+  @Deprecated(forRemoval = true)
   public static String getHost(final String validUri) {
     return URI.create(validUri).getRawAuthority();
   }

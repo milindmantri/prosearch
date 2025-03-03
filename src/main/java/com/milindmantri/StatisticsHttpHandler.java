@@ -12,6 +12,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -19,8 +20,12 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public record StatisticsHttpHandler(DataSource datasource, Stream<String> startHosts)
+public record StatisticsHttpHandler(DataSource datasource, Set<String> startHosts)
     implements HttpHandler {
+
+  public StatisticsHttpHandler(DataSource ds, Stream<String> startHosts) {
+    this(ds, startHosts.collect(Collectors.toSet()));
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StatisticsHttpHandler.class);
 
@@ -90,7 +95,7 @@ public record StatisticsHttpHandler(DataSource datasource, Stream<String> startH
   // for testing
   Stream<Stat> getSummary(final ResultSet rs) throws SQLException {
     Stream.Builder<Stat> builder = Stream.builder();
-    Set<String> zeroCrawls = this.startHosts.collect(Collectors.toSet());
+    Set<String> zeroCrawls = new HashSet<>(this.startHosts);
 
     while (rs.next()) {
       String domain = rs.getString("host");
@@ -102,7 +107,7 @@ public record StatisticsHttpHandler(DataSource datasource, Stream<String> startH
       builder.accept(new Stat(domain, count, size));
     }
 
-    zeroCrawls.stream().map(s -> new Stat(s, 0, "-")).forEach(builder);
+    zeroCrawls.stream().map(DomainCounter::getHost).map(s -> new Stat(s, 0, "-")).forEach(builder);
 
     return builder.build();
   }
