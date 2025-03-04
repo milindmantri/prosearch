@@ -1,6 +1,5 @@
 package com.milindmantri;
 
-import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
@@ -108,7 +107,7 @@ public final class CrawlerRunner implements Runnable {
 
         config.setCrawlerConfigs(crawlerConfig);
 
-        HttpCollector spider = new HttpCollector(config);
+        ProCollector spider = new ProCollector(config, domainCounter);
 
         if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
           spider.clean();
