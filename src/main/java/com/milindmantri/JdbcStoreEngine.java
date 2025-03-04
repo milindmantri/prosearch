@@ -338,4 +338,12 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
       throw new DataStoreException("Could not check if table '" + tableName + "' exists.", e);
     }
   }
+
+  public boolean hasQueuedTable() {
+    return this.tableExist(queuedTableName());
+  }
+
+  public String queuedTableName() {
+    return this.tableName(JdbcStore.QUEUED_STORE);
+  }
 }

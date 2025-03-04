@@ -121,7 +121,7 @@ public class DomainCounter
 
   /** Caller is responsible for closing dataSource */
   @Deprecated(forRemoval = true)
-  public DomainCounter(final int limit, final DataSource dataSource) throws SQLException {
+  public DomainCounter(final int limit, final DataSource dataSource) {
     if (limit <= 0) {
       throw new IllegalArgumentException(
           "Limit must be greater than zero, but was %d.".formatted(limit));
@@ -135,8 +135,6 @@ public class DomainCounter
     this.dataSource = dataSource;
 
     this.delayResolver.setScope(AbstractDelayResolver.SCOPE_SITE);
-
-    restoreCount();
   }
 
   /** Caller is responsible for closing dataSource */
@@ -260,27 +258,64 @@ public class DomainCounter
     return acceptHost(new Host(URI.create(context.getDocument().getReference())));
   }
 
-  private void restoreCount() throws SQLException {
+  public void restoreCount(final JdbcStoreEngine engine) throws SQLException {
 
+    if (engine.hasQueuedTable()) {
+      restoreInternal(
+          """
+        SELECT DISTINCT host, 0 as c
+        FROM %s
+        GROUP BY host
+        """
+              .formatted(engine.queuedTableName()));
+    }
+
+    restoreInternal(
+        """
+    SELECT
+      host, count(*)
+    FROM
+      host_count
+    GROUP BY host
+    """);
+  }
+
+  static class WrappedSqlException extends RuntimeException {
+    public WrappedSqlException(final Exception e) {
+      super(e);
+    }
+  }
+
+  private void restoreInternal(final String sql) throws SQLException {
     try (var con = this.dataSource.getConnection();
-        var ps =
-            con.prepareStatement(
-                """
-            SELECT
-              count(*), host
-            FROM
-              host_count
-            GROUP BY host
-          """)) {
+        var ps = con.prepareStatement(sql)) {
 
       ResultSet rs = ps.executeQuery();
 
-      while (rs.next()) {
-        int count = rs.getInt(1);
-        Host host = new Host(rs.getString(2));
-
-        this.count.put(host, new AtomicInteger(count));
+      try {
+        Stream.iterate(
+                rs,
+                resultSet -> {
+                  try {
+                    return resultSet.next();
+                  } catch (SQLException e) {
+                    throw new WrappedSqlException(e);
+                  }
+                },
+                resultSet -> resultSet)
+            .forEach(
+                resultSet -> {
+                  try {
+                    this.count.put(
+                        new Host(resultSet.getString(1)), new AtomicInteger(resultSet.getInt(2)));
+                  } catch (SQLException e) {
+                    throw new WrappedSqlException(e);
+                  }
+                });
+      } catch (WrappedSqlException e) {
+        throw ((SQLException) e.getCause());
       }
+
     } catch (final SQLException ex) {
       // check if table exists
       if (!PG_UNDEFINED_RELATION_ERR_CODE.equals(ex.getSQLState())) {

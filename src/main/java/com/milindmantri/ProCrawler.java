@@ -8,11 +8,13 @@ import com.norconex.collector.http.pipeline.importer.HttpImporterPipeline;
 import com.norconex.collector.http.pipeline.importer.HttpImporterPipelineContext;
 import com.norconex.commons.lang.pipeline.IPipelineStage;
 import com.norconex.importer.response.ImporterResponse;
+import java.sql.SQLException;
 import java.util.List;
 
 public class ProCrawler extends HttpCrawler {
 
   private final DomainCounter domainCounter;
+  private final HttpCrawlerConfig config;
 
   private static class ImporterQueueRejectPipeline extends HttpImporterPipeline {
 
@@ -38,6 +40,7 @@ public class ProCrawler extends HttpCrawler {
     super(crawlerConfig, collector);
 
     this.domainCounter = domainCounter;
+    this.config = crawlerConfig;
   }
 
   @Override
@@ -52,5 +55,19 @@ public class ProCrawler extends HttpCrawler {
         .execute(httpContext);
 
     return httpContext.getImporterResponse();
+  }
+
+  @Override
+  protected void beforeCrawlerExecution(final boolean resume) {
+    super.beforeCrawlerExecution(resume);
+
+    // initial queue is not set correctly if the crawler fails when doing initial crawl
+    // TODO: Improve by finding diff-ed start URLs and initiating a crawl on them
+
+    try {
+      domainCounter.restoreCount((JdbcStoreEngine) this.config.getDataStoreEngine());
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
