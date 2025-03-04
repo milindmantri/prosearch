@@ -197,8 +197,7 @@ public class JdbcStore<T> implements IDataStore<T> {
     if (!rec.isEmpty()) {
       delete(rec.id);
 
-      return rec.object
-        .filter(_ -> domainCounter.acceptHost(new Host(URI.create(rec.id))));
+      return rec.object.filter(_ -> domainCounter.acceptHost(new Host(URI.create(rec.id))));
     }
     return rec.object;
   }

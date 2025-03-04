@@ -11,7 +11,6 @@ import com.norconex.commons.lang.map.Properties;
 import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
 import java.sql.SQLException;
-import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -45,8 +44,8 @@ class JdbcStoreTest {
   @BeforeEach
   void createTable() throws SQLException {
     try (var con = ds.getConnection();
-      var ps = con.prepareStatement(DomainCounter.CREATE_TABLE);
-      var indexPs = con.prepareStatement(DomainCounter.CREATE_INDEX)) {
+        var ps = con.prepareStatement(DomainCounter.CREATE_TABLE);
+        var indexPs = con.prepareStatement(DomainCounter.CREATE_INDEX)) {
       ps.executeUpdate();
       indexPs.executeUpdate();
     }
@@ -64,12 +63,15 @@ class JdbcStoreTest {
     try (var engine = new JdbcStoreEngine(Mockito.mock(DomainCounter.class))) {
 
       engine.setConfigProperties(new Properties(TestCommons.dbProps()));
-      engine.
-        init(crawler);
+      engine.init(crawler);
 
       // creating store should auto create table
       try (var _ =
-          new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, Mockito.mock(DomainCounter.class))) {
+          new JdbcStore<>(
+              engine,
+              JdbcStore.QUEUED_STORE,
+              CrawlDocInfo.class,
+              Mockito.mock(DomainCounter.class))) {
 
         assertDoesNotThrow(
             () ->
@@ -101,7 +103,11 @@ class JdbcStoreTest {
 
       // creating store should auto create table
       try (var store =
-          new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, Mockito.mock(DomainCounter.class))) {
+          new JdbcStore<>(
+              engine,
+              JdbcStore.QUEUED_STORE,
+              CrawlDocInfo.class,
+              Mockito.mock(DomainCounter.class))) {
 
         store.save("https://sub.some.com/hello-world", new CrawlDocInfo());
 
@@ -147,7 +153,11 @@ class JdbcStoreTest {
 
       // creating store should auto create table
       try (var store =
-          new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, Mockito.mock(DomainCounter.class))) {
+          new JdbcStore<>(
+              engine,
+              JdbcStore.QUEUED_STORE,
+              CrawlDocInfo.class,
+              Mockito.mock(DomainCounter.class))) {
 
         store.save("https://sub.some.com/hello-world", new CrawlDocInfo());
 
@@ -171,7 +181,7 @@ class JdbcStoreTest {
     final String s2 = "https://site2.com";
 
     DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2).map(URI::create));
-    dc.acceptMetadata(s1,TestCommons.VALID_PROPS);
+    dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
     dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
 
     try (var engine = new JdbcStoreEngine(dc)) {
@@ -180,12 +190,11 @@ class JdbcStoreTest {
       engine.init(crawler);
 
       // creating store should auto create table
-      try (var store =
-          new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
+      try (var store = new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
 
         TestCommons.exec(
-          ds,
-          """
+            ds,
+            """
       INSERT INTO %1$s (id, host, modified, json)
       VALUES
       ('%2$s/1', '%3$s', now(), '{"reference": "%2$s/1"}'),
@@ -193,12 +202,8 @@ class JdbcStoreTest {
       ('%4$s/3', '%5$s', now(), '{"reference": "%4$s/3"}'),
       ('%4$s/4', '%5$s', now() + interval '1 second', '{"reference": "%4$s/4"}')
       """
-            .formatted(
-              QUEUE_TABLE,
-              s1,
-              new Host(URI.create(s1)),
-              s2,
-          new Host(URI.create(s2))));
+                .formatted(
+                    QUEUE_TABLE, s1, new Host(URI.create(s1)), s2, new Host(URI.create(s2))));
 
         assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
         assertEquals(s2 + "/3", store.deleteFirst().get().getReference());
@@ -219,7 +224,7 @@ class JdbcStoreTest {
     final String s2 = "https://site2.com";
 
     DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2).map(URI::create));
-    dc.acceptMetadata(s1,TestCommons.VALID_PROPS);
+    dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
     dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
 
     try (var engine = new JdbcStoreEngine(dc)) {
@@ -228,22 +233,17 @@ class JdbcStoreTest {
       engine.init(crawler);
 
       // creating store should auto create table
-      try (var store =
-        new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
+      try (var store = new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
 
         TestCommons.exec(
-          ds,
-          """
+            ds,
+            """
       INSERT INTO %1$s (id, host, modified, json)
       VALUES
       ('%2$s/1', '%3$s', now(), '{"reference": "%2$s/1"}'),
       ('%2$s/2', '%3$s', now() + interval '1 second', '{"reference": "%2$s/2"}')
       """
-            .formatted(
-              QUEUE_TABLE,
-              s1,
-              new Host(URI.create(s1))
-            ));
+                .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
 
         assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
         assertEquals(s1 + "/2", store.deleteFirst().get().getReference());
@@ -273,12 +273,11 @@ class JdbcStoreTest {
       engine.init(crawler);
 
       // creating store should auto create table
-      try (var store =
-        new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
+      try (var store = new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
 
         TestCommons.exec(
-          ds,
-          """
+            ds,
+            """
       INSERT INTO %1$s (id, host, modified, json)
       VALUES
       ('%2$s',   '%3$s', now(),                       '{"reference": "%2$s"}'),
@@ -286,27 +285,26 @@ class JdbcStoreTest {
       ('%2$s/2', '%3$s', now() + interval '2 second', '{"reference": "%2$s/3"}'),
       ('%2$s/3', '%3$s', now() + interval '3 second', '{"reference": "%2$s/4"}')
       """
-            .formatted(
-              QUEUE_TABLE,
-              s1,
-              new Host(URI.create(s1))
-            ));
+                .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
 
         assertEquals(s1, store.deleteFirst().get().getReference());
-        dc.acceptMetadata(s1,TestCommons.VALID_PROPS);
+        dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
         assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
         dc.acceptMetadata(s1 + "/1", TestCommons.VALID_PROPS);
 
         assertTrue(store.deleteFirst().isEmpty());
         assertTrue(store.deleteFirst().isEmpty());
 
-        TestCommons.query(ds, "SELECT count(*) from %s".formatted(QUEUE_TABLE), rs -> {
-          try {
-            return rs.next() ? rs.getInt(1) : 0;
-          } catch (SQLException e) {
-            throw new RuntimeException(e);
-          }
-        });
+        TestCommons.query(
+            ds,
+            "SELECT count(*) from %s".formatted(QUEUE_TABLE),
+            rs -> {
+              try {
+                return rs.next() ? rs.getInt(1) : 0;
+              } catch (SQLException e) {
+                throw new RuntimeException(e);
+              }
+            });
       }
     }
   }
