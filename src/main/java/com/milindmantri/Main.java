@@ -57,12 +57,12 @@ public class Main {
     try (var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()));
         ScheduledExecutorService crawlerScheduler = Executors.newSingleThreadScheduledExecutor()) {
 
-      Set<String> startUrls;
+      Set<URI> startUrls;
       try (InputStream is = classloader.getResourceAsStream("start-urls");
           var isr = new InputStreamReader(is);
           var reader = new BufferedReader(isr)) {
 
-        startUrls = reader.lines().collect(Collectors.toSet());
+        startUrls = reader.lines().map(URI::create).collect(Collectors.toSet());
 
       } catch (IOException e) {
         throw new RuntimeException(e);
@@ -94,8 +94,7 @@ public class Main {
 
       int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
 
-      HttpServer httpServer =
-          httpServer(httpPort, client, dataSource, startUrls.stream().map(URI::create));
+      HttpServer httpServer = httpServer(httpPort, client, dataSource, startUrls.stream());
 
       httpServer.start();
 

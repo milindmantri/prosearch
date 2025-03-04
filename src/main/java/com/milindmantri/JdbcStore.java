@@ -9,6 +9,7 @@ import com.google.gson.GsonBuilder;
 import com.norconex.collector.core.store.DataStoreException;
 import com.norconex.collector.core.store.IDataStore;
 import java.io.IOException;
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -109,7 +110,7 @@ public class JdbcStore<T> implements IDataStore<T> {
           stmt.setString(3, GSON.toJson(object));
 
           if (isQueued()) {
-            stmt.setString(4, DomainCounter.getHost(idValue));
+            stmt.setString(4, new Host(URI.create(idValue)).toString());
           }
         });
   }
@@ -161,7 +162,7 @@ public class JdbcStore<T> implements IDataStore<T> {
   public Optional<T> deleteFirst() {
 
     if (isQueued()) {
-      final Optional<String> next = this.domainCounter.getNextHost();
+      final Optional<Host> next = this.domainCounter.getNextHost();
       if (next.isPresent()) {
 
         final String sql = "SELECT id, json FROM <table> WHERE host = ? ORDER BY modified LIMIT 1";
@@ -174,7 +175,7 @@ public class JdbcStore<T> implements IDataStore<T> {
                     ResultSet.TYPE_SCROLL_INSENSITIVE,
                     CONCUR_UPDATABLE)) {
 
-          stmt.setString(1, next.get());
+          stmt.setString(1, next.get().toString());
 
           var rec = firstRecord(stmt.executeQuery());
           if (!rec.isEmpty()) {

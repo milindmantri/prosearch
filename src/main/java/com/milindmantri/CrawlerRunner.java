@@ -8,6 +8,7 @@ import com.norconex.collector.http.link.impl.HtmlLinkExtractor;
 import com.norconex.collector.http.url.IURLNormalizer;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.unit.DataUnit;
+import java.net.URI;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Stream;
@@ -22,10 +23,10 @@ public final class CrawlerRunner implements Runnable {
 
   private final DataSource datasource;
   private final TantivyClient client;
-  private final List<String> startUrls;
+  private final List<URI> startUrls;
 
   public CrawlerRunner(
-      final DataSource datasource, final TantivyClient client, final Stream<String> startUrls) {
+      final DataSource datasource, final TantivyClient client, final Stream<URI> startUrls) {
     if (datasource == null) {
       throw new IllegalArgumentException("datasource must not be null.");
     }
@@ -67,7 +68,7 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setUrlNormalizer(URL_NORMALIZER);
 
-    crawlerConfig.setStartURLs(this.startUrls);
+    crawlerConfig.setStartURLs(this.startUrls.stream().map(URI::toString).toList());
 
     crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
 

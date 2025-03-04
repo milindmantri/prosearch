@@ -9,6 +9,7 @@ import com.norconex.collector.core.crawler.Crawler;
 import com.norconex.collector.core.doc.CrawlDocInfo;
 import com.norconex.commons.lang.map.Properties;
 import com.zaxxer.hikari.HikariDataSource;
+import java.net.URI;
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -63,7 +64,8 @@ class JdbcStoreTest {
     try (var engine = new JdbcStoreEngine(Mockito.mock(DomainCounter.class))) {
 
       engine.setConfigProperties(new Properties(TestCommons.dbProps()));
-      engine.init(crawler);
+      engine.
+        init(crawler);
 
       // creating store should auto create table
       try (var _ =
@@ -168,7 +170,7 @@ class JdbcStoreTest {
     final String s1 = "http://site1.com";
     final String s2 = "https://site2.com";
 
-    DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2));
+    DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2).map(URI::create));
     dc.acceptMetadata(s1,TestCommons.VALID_PROPS);
     dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
 
@@ -194,10 +196,9 @@ class JdbcStoreTest {
             .formatted(
               QUEUE_TABLE,
               s1,
-              DomainCounter.getHost(s1),
+              new Host(URI.create(s1)),
               s2,
-              DomainCounter.getHost(s2)
-            ));
+          new Host(URI.create(s2))));
 
         assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
         assertEquals(s2 + "/3", store.deleteFirst().get().getReference());
@@ -217,7 +218,7 @@ class JdbcStoreTest {
     final String s1 = "http://site1.com";
     final String s2 = "https://site2.com";
 
-    DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2));
+    DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2).map(URI::create));
     dc.acceptMetadata(s1,TestCommons.VALID_PROPS);
     dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
 
@@ -241,14 +242,14 @@ class JdbcStoreTest {
             .formatted(
               QUEUE_TABLE,
               s1,
-              DomainCounter.getHost(s1)
+              new Host(URI.create(s1))
             ));
 
         assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
         assertEquals(s1 + "/2", store.deleteFirst().get().getReference());
 
-        assertEquals(DomainCounter.getHost(s1), dc.getNextHost().get());
-        assertEquals(DomainCounter.getHost(s1), dc.getNextHost().get());
+        assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
+        assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
       }
     }
   }

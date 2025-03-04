@@ -14,7 +14,6 @@ import com.norconex.collector.http.robot.RobotsTxt;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
 import com.norconex.commons.lang.map.Properties;
-import com.norconex.commons.lang.net.Host;
 import com.norconex.commons.lang.text.TextMatcher;
 import com.norconex.importer.doc.Doc;
 import java.net.URI;
@@ -63,12 +62,12 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
 
   private final int limit;
 
-  private final Map<String, AtomicInteger> count = new ConcurrentHashMap<>();
+  private final Map<Host, AtomicInteger> count = new ConcurrentHashMap<>();
 
   private final DataSource dataSource;
   // TODO: make final
-  private final Set<String> notQueuedHosts = ConcurrentHashMap.newKeySet();
-  private String[] startUrls;
+  private final Set<Host> notQueuedHosts = ConcurrentHashMap.newKeySet();
+  private Host[] startUrls;
   private PrimitiveIterator.OfInt nextHostIndex;
 
   // TODO: Add custom first stage which rejects in importer pipeline and remove delay resolver
@@ -134,11 +133,11 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
   }
 
   /** Caller is responsible for closing dataSource */
-  public DomainCounter(final int limit, final DataSource dataSource, final Stream<String> startUrls)
+  public DomainCounter(final int limit, final DataSource dataSource, final Stream<URI> startUrls)
       throws SQLException {
     this(limit, dataSource);
 
-    this.startUrls = startUrls.map(DomainCounter::getHost).toArray(String[]::new);
+    this.startUrls = startUrls.map(Host::new).toArray(Host[]::new);
     // infinite stream over index
     this.nextHostIndex = IntStream.iterate(0, i -> (i + 1) % this.startUrls.length).iterator();
   }
@@ -157,7 +156,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
 
     // ref is already normalized
     final URI uri = URI.create(ref);
-    final String host = uri.getRawAuthority();
+    final Host host = new Host(uri);
     final String reference = removeScheme(uri);
 
     // TODO: insertIntoDb and local count handling should happen in a txn
@@ -219,7 +218,11 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
       }
     } else if (event instanceof CrawlerEvent ce && ce.is(CrawlerEvent.DOCUMENT_QUEUED)) {
       // host has been queued, remove from not queued hosts if it exists there.
-      String host = getHost(ce.getCrawlDocInfo().getReference());
+      Host host = new Host(URI.create(ce.getCrawlDocInfo().getReference()));
+
+      if (!isQueuedOnce(host)) {
+        count.put(host, new AtomicInteger(0));
+      }
       this.notQueuedHosts.remove(host);
     }
   }
@@ -234,8 +237,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     final String normalized = CrawlerRunner.URL_NORMALIZER.normalizeURL(reference);
 
     // ref is already normalized
-    final URI uri = URI.create(normalized);
-    final String host = uri.getRawAuthority();
+    final Host host = new Host(URI.create(normalized));
     return acceptHost(host);
   }
 
@@ -260,7 +262,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
 
       while (rs.next()) {
         int count = rs.getInt(1);
-        String host = rs.getString(2);
+        Host host = new Host(rs.getString(2));
 
         this.count.put(host, new AtomicInteger(count));
       }
@@ -275,11 +277,11 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     }
   }
 
-  private boolean insertIntoDb(final String host, final String reference) {
+  private boolean insertIntoDb(final Host host, final String reference) {
     try (var con = this.dataSource.getConnection();
         var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
 
-      ps.setString(1, host);
+      ps.setString(1, host.toString());
       ps.setString(2, reference);
 
       ps.executeUpdate();
@@ -313,26 +315,6 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return sb.toString();
   }
 
-  public record Host(String host) {
-    public Host {
-      if (host == null || host.isBlank()) {
-        throw new IllegalArgumentException("host must not be null or blank.");
-      }
-
-      // TODO: add host validation
-    }
-  }
-
-  // TODO: Rename
-  public static Host getHostMethod(final String validUri) {
-    return new Host(URI.create(validUri).getRawAuthority());
-  }
-
-  @Deprecated(forRemoval = true)
-  public static String getHost(final String validUri) {
-    return URI.create(validUri).getRawAuthority();
-  }
-
   private static List<IMetadataFilter> getTextOnlyMetadataFilters() {
     return Stream.of("text/html", "application/xhtml+xml", "text/plain")
         .map(t -> t + "*")
@@ -346,12 +328,12 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
         .toList();
   }
 
-  public boolean isCrawledOnce(String host) {
+  public boolean isQueuedOnce(Host host) {
     return this.count.containsKey(host);
   }
 
-  private boolean acceptHost(String host) {
-    if (isCrawledOnce(host)) {
+  private boolean acceptHost(Host host) {
+    if (isQueuedOnce(host)) {
       AtomicInteger i = count.get(host);
 
       return i.get() < limit;
@@ -361,11 +343,11 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
   }
 
   /** Helper to get next host to pull entry from queue */
-  public Optional<String> getNextHost() {
+  public Optional<Host> getNextHost() {
 
     if (this.nextHostIndex.hasNext()) {
 
-      String host = null;
+      Host host = null;
       int firstIndex = -1;
 
       do {
@@ -379,7 +361,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
         }
 
         host = this.startUrls[i];
-      } while (!(isCrawledOnce(host) && acceptHost(host) && maybeQueued(host))
+      } while (!(isQueuedOnce(host) && acceptHost(host) && maybeQueued(host))
           && this.nextHostIndex.hasNext());
 
       return Optional.of(host);
@@ -387,12 +369,12 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return Optional.empty();
   }
 
-  private boolean maybeQueued(final String host) {
+  private boolean maybeQueued(final Host host) {
     return !this.notQueuedHosts.contains(host);
   }
 
   /** Call when host is not found when looking in queue */
-  public void notQueued(final String host) {
+  public void notQueued(final Host host) {
     this.notQueuedHosts.add(host);
   }
 }
