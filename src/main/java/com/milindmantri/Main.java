@@ -94,7 +94,8 @@ public class Main {
 
       int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
 
-      HttpServer httpServer = httpServer(httpPort, client, dataSource, startUrls.stream());
+      HttpServer httpServer =
+          httpServer(httpPort, client, dataSource, startUrls.stream().map(URI::create));
 
       httpServer.start();
 
@@ -110,7 +111,7 @@ public class Main {
       final int port,
       final TantivyClient tantivyClient,
       final DataSource datasource,
-      final Stream<String> startUrls)
+      final Stream<URI> startUrls)
       throws IOException {
     HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
     httpServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());

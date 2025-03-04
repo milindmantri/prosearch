@@ -3,8 +3,8 @@ package com.milindmantri;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.zaxxer.hikari.HikariDataSource;
+import java.net.URI;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -61,12 +61,21 @@ class StatisticsHttpHandlerTest {
 
       var stats =
           new StatisticsHttpHandler(
-              datasource, Stream.of("www.uncrawlable.com", "www.hello.com", "www.example.com"));
+              datasource,
+              Stream.of(
+                      "http://www.uncrawlable.com",
+                      "http://www.hello.com",
+                      "http://www.example.com")
+                  .map(URI::create));
 
       var statStream = stats.getSummary(getStats.executeQuery());
 
       var list = statStream.map(StatisticsHttpHandler.Stat::domain).toList();
-      assertEquals(List.of("www.example.com", "www.hello.com", "www.uncrawlable.com"), list);
+      assertEquals(
+          Stream.of("www.example.com", "www.hello.com", "www.uncrawlable.com")
+              .map(Host::new)
+              .toList(),
+          list);
     }
   }
 }

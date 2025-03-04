@@ -73,7 +73,7 @@ public class StatisticsPage {
             stat ->
                 Html.tr(
                     Stream.of(
-                        Html.td(stat.domain()),
+                        Html.td(stat.domain().toString()),
                         Html.td(String.valueOf(stat.links())),
                         Html.td(stat.prettySize()))));
 

@@ -20,11 +20,11 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public record StatisticsHttpHandler(DataSource datasource, Set<String> startHosts)
+public record StatisticsHttpHandler(DataSource datasource, Set<Host> startHosts)
     implements HttpHandler {
 
-  public StatisticsHttpHandler(DataSource ds, Stream<String> startHosts) {
-    this(ds, startHosts.collect(Collectors.toSet()));
+  public StatisticsHttpHandler(DataSource ds, Stream<URI> startUrls) {
+    this(ds, startUrls.map(Host::new).collect(Collectors.toSet()));
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StatisticsHttpHandler.class);
@@ -45,7 +45,7 @@ public record StatisticsHttpHandler(DataSource datasource, Set<String> startHost
 
   public static final String STATISTICS_PAGE_PATH = "/stats/";
 
-  public record Stat(String domain, int links, String prettySize) {}
+  public record Stat(Host domain, int links, String prettySize) {}
 
   @Override
   public void handle(final HttpExchange exchange) throws IOException {
@@ -95,10 +95,10 @@ public record StatisticsHttpHandler(DataSource datasource, Set<String> startHost
   // for testing
   Stream<Stat> getSummary(final ResultSet rs) throws SQLException {
     Stream.Builder<Stat> builder = Stream.builder();
-    Set<String> zeroCrawls = new HashSet<>(this.startHosts);
+    Set<Host> zeroCrawls = new HashSet<>(this.startHosts);
 
     while (rs.next()) {
-      String domain = rs.getString("host");
+      Host domain = new Host(rs.getString("host"));
       zeroCrawls.remove(domain);
 
       int count = rs.getInt("urls");
@@ -107,7 +107,7 @@ public record StatisticsHttpHandler(DataSource datasource, Set<String> startHost
       builder.accept(new Stat(domain, count, size));
     }
 
-    zeroCrawls.stream().map(DomainCounter::getHost).map(s -> new Stat(s, 0, "-")).forEach(builder);
+    zeroCrawls.stream().map(s -> new Stat(s, 0, "-")).forEach(builder);
 
     return builder.build();
   }
