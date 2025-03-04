@@ -1,9 +1,11 @@
 package com.milindmantri;
 
 import com.norconex.collector.core.crawler.CrawlerEvent;
+import com.norconex.collector.core.doc.CrawlState;
 import com.norconex.collector.core.filter.IMetadataFilter;
 import com.norconex.collector.core.filter.IReferenceFilter;
 import com.norconex.collector.core.filter.impl.MetadataFilter;
+import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
 import com.norconex.collector.http.delay.IDelayResolver;
 import com.norconex.collector.http.delay.impl.AbstractDelayResolver;
 import com.norconex.collector.http.delay.impl.GenericDelayResolver;
@@ -14,6 +16,7 @@ import com.norconex.collector.http.robot.RobotsTxt;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
 import com.norconex.commons.lang.map.Properties;
+import com.norconex.commons.lang.pipeline.IPipelineStage;
 import com.norconex.commons.lang.text.TextMatcher;
 import com.norconex.importer.doc.Doc;
 import java.net.URI;
@@ -32,7 +35,11 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IReferenceFilter {
+public class DomainCounter
+    implements IMetadataFilter,
+        IEventListener<Event>,
+        IReferenceFilter,
+        IPipelineStage<ImporterPipelineContext> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DomainCounter.class);
 
@@ -245,6 +252,14 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return this.modifiedHttpFetcher;
   }
 
+  @Override
+  public boolean execute(final ImporterPipelineContext context) {
+    // results in NPE if not set (incorrect expectation in lib)
+    context.getDocInfo().setState(CrawlState.REJECTED);
+
+    return acceptHost(new Host(URI.create(context.getDocument().getReference())));
+  }
+
   private void restoreCount() throws SQLException {
 
     try (var con = this.dataSource.getConnection();
@@ -332,7 +347,7 @@ public class DomainCounter implements IMetadataFilter, IEventListener<Event>, IR
     return this.count.containsKey(host);
   }
 
-  private boolean acceptHost(Host host) {
+  public boolean acceptHost(Host host) {
     if (isQueuedOnce(host)) {
       AtomicInteger i = count.get(host);
 

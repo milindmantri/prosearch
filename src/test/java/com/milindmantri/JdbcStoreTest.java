@@ -37,7 +37,7 @@ class JdbcStoreTest {
     TestCommons.exec(
         ds,
         """
-  DROP TABLE %s;
+  DROP TABLE %s, host_count;
   """
             .formatted(QUEUE_TABLE));
   }
@@ -250,6 +250,63 @@ class JdbcStoreTest {
 
         assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
         assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
+      }
+    }
+  }
+
+  @Test
+  void deleteFirstNextHostLimitReached() throws SQLException {
+    Crawler crawler = Mockito.mock(Crawler.class);
+    Collector collector = Mockito.mock(Collector.class);
+
+    Mockito.when(collector.getId()).thenReturn(COLLECTOR);
+    Mockito.when(crawler.getId()).thenReturn(CRAWLER);
+    Mockito.when(crawler.getCollector()).thenReturn(collector);
+
+    final String s1 = "http://site1.com";
+
+    DomainCounter dc = new DomainCounter(2, ds, Stream.of(s1).map(URI::create));
+
+    try (var engine = new JdbcStoreEngine(dc)) {
+
+      engine.setConfigProperties(new Properties(TestCommons.dbProps()));
+      engine.init(crawler);
+
+      // creating store should auto create table
+      try (var store =
+        new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
+
+        TestCommons.exec(
+          ds,
+          """
+      INSERT INTO %1$s (id, host, modified, json)
+      VALUES
+      ('%2$s',   '%3$s', now(),                       '{"reference": "%2$s"}'),
+      ('%2$s/1', '%3$s', now() + interval '1 second', '{"reference": "%2$s/1"}'),
+      ('%2$s/2', '%3$s', now() + interval '2 second', '{"reference": "%2$s/3"}'),
+      ('%2$s/3', '%3$s', now() + interval '3 second', '{"reference": "%2$s/4"}')
+      """
+            .formatted(
+              QUEUE_TABLE,
+              s1,
+              new Host(URI.create(s1))
+            ));
+
+        assertEquals(s1, store.deleteFirst().get().getReference());
+        dc.acceptMetadata(s1,TestCommons.VALID_PROPS);
+        assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
+        dc.acceptMetadata(s1 + "/1", TestCommons.VALID_PROPS);
+
+        assertTrue(store.deleteFirst().isEmpty());
+        assertTrue(store.deleteFirst().isEmpty());
+
+        TestCommons.query(ds, "SELECT count(*) from %s".formatted(QUEUE_TABLE), rs -> {
+          try {
+            return rs.next() ? rs.getInt(1) : 0;
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        });
       }
     }
   }

@@ -196,6 +196,9 @@ public class JdbcStore<T> implements IDataStore<T> {
             "SELECT id, json FROM <table> ORDER BY modified LIMIT 1", NO_ARGS, this::firstRecord);
     if (!rec.isEmpty()) {
       delete(rec.id);
+
+      return rec.object
+        .filter(_ -> domainCounter.acceptHost(new Host(URI.create(rec.id))));
     }
     return rec.object;
   }
