@@ -162,7 +162,7 @@ class JdbcStoreTest {
         store.save("https://sub.some.com/hello-world", new CrawlDocInfo());
 
         var maybeRec = store.deleteFirst();
-        assertTrue(maybeRec.isPresent());
+        assertTrue(maybeRec.isEmpty());
       }
     }
   }
