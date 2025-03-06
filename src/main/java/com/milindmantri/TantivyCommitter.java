@@ -160,7 +160,7 @@ public class TantivyCommitter extends AbstractCommitter {
             con.prepareStatement("INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
       ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
 
-      ps.setString(2, DomainCounter.removeScheme(uri));
+      ps.setString(2, Manager.removeScheme(uri));
       ps.setLong(3, length);
       ps.executeUpdate();
     }
@@ -171,7 +171,7 @@ public class TantivyCommitter extends AbstractCommitter {
         var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
       ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
 
-      ps.setString(2, DomainCounter.removeScheme(uri));
+      ps.setString(2, Manager.removeScheme(uri));
       ps.executeUpdate();
     }
   }

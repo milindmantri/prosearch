@@ -87,10 +87,10 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
   private String varcharType;
   private String timestapType;
   private String textType;
-  private final DomainCounter domainCounter;
+  private final Manager manager;
 
-  public JdbcStoreEngine(DomainCounter domainCounter) {
-    this.domainCounter = Objects.requireNonNull(domainCounter, "domainCounter must not be null.");
+  public JdbcStoreEngine(Manager manager) {
+    this.manager = Objects.requireNonNull(manager, "domainCounter must not be null.");
   }
 
   public Properties getConfigProperties() {
@@ -147,7 +147,7 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
     tableAdapter = resolveTableAdapter();
 
     // store types for each table
-    storeTypes = new JdbcStore<>(this, STORE_TYPES_NAME, String.class, this.domainCounter);
+    storeTypes = new JdbcStore<>(this, STORE_TYPES_NAME, String.class, this.manager);
   }
 
   private ProsearchTableAdapter resolveTableAdapter() {
@@ -186,7 +186,7 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
   @Override
   public <T> IDataStore<T> openStore(String storeName, Class<? extends T> type) {
     storeTypes.save(storeName, type.getName());
-    return new JdbcStore<>(this, storeName, type, this.domainCounter);
+    return new JdbcStore<>(this, storeName, type, this.manager);
   }
 
   @Override

@@ -35,13 +35,13 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DomainCounter
+public class Manager
     implements IMetadataFilter,
         IEventListener<Event>,
         IReferenceFilter,
         IPipelineStage<ImporterPipelineContext> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(DomainCounter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(Manager.class);
 
   private static final List<IMetadataFilter> CONTENT_TYPE_FILTERS = getTextOnlyMetadataFilters();
 
@@ -121,7 +121,7 @@ public class DomainCounter
 
   /** Caller is responsible for closing dataSource */
   @Deprecated(forRemoval = true)
-  public DomainCounter(final int limit, final DataSource dataSource) {
+  public Manager(final int limit, final DataSource dataSource) {
     if (limit <= 0) {
       throw new IllegalArgumentException(
           "Limit must be greater than zero, but was %d.".formatted(limit));
@@ -138,7 +138,7 @@ public class DomainCounter
   }
 
   /** Caller is responsible for closing dataSource */
-  public DomainCounter(final int limit, final DataSource dataSource, final Stream<URI> startUrls)
+  public Manager(final int limit, final DataSource dataSource, final Stream<URI> startUrls)
       throws SQLException {
     this(limit, dataSource);
 

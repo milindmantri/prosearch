@@ -13,7 +13,7 @@ import java.util.List;
 
 public class ProCrawler extends HttpCrawler {
 
-  private final DomainCounter domainCounter;
+  private final Manager manager;
   private final HttpCrawlerConfig config;
 
   private static class ImporterQueueRejectPipeline extends HttpImporterPipeline {
@@ -36,10 +36,10 @@ public class ProCrawler extends HttpCrawler {
   public ProCrawler(
       final HttpCrawlerConfig crawlerConfig,
       final HttpCollector collector,
-      final DomainCounter domainCounter) {
+      final Manager manager) {
     super(crawlerConfig, collector);
 
-    this.domainCounter = domainCounter;
+    this.manager = manager;
     this.config = crawlerConfig;
   }
 
@@ -51,7 +51,7 @@ public class ProCrawler extends HttpCrawler {
     new ImporterQueueRejectPipeline(
             getCrawlerConfig().isKeepDownloads(),
             importerContext.getDocument().isOrphan(),
-            domainCounter)
+      manager)
         .execute(httpContext);
 
     return httpContext.getImporterResponse();
@@ -65,7 +65,7 @@ public class ProCrawler extends HttpCrawler {
     // TODO: Improve by finding diff-ed start URLs and initiating a crawl on them
 
     try {
-      domainCounter.restoreCount((JdbcStoreEngine) this.config.getDataStoreEngine());
+      manager.restoreCount((JdbcStoreEngine) this.config.getDataStoreEngine());
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }

@@ -44,20 +44,20 @@ public class JdbcStore<T> implements IDataStore<T> {
   private String storeName;
   private final Class<? extends T> type;
   private final ProsearchTableAdapter adapter;
-  private final DomainCounter domainCounter;
+  private final Manager manager;
 
   JdbcStore(
       JdbcStoreEngine engine,
       String storeName,
       Class<? extends T> type,
-      final DomainCounter domainCounter) {
+      final Manager manager) {
     super();
     this.engine = requireNonNull(engine, "'engine' must not be null.");
     this.type = requireNonNull(type, "'type' must not be null.");
     this.adapter = engine.getTableAdapter();
     this.storeName = requireNonNull(storeName, "'storeName' must not be null.");
     this.tableName = engine.tableName(storeName);
-    this.domainCounter = requireNonNull(domainCounter, "domainCounter must not be null.");
+    this.manager = requireNonNull(manager, "domainCounter must not be null.");
     if (!engine.tableExist(tableName)) {
       createTable();
     }
@@ -162,7 +162,7 @@ public class JdbcStore<T> implements IDataStore<T> {
   public Optional<T> deleteFirst() {
 
     if (isQueued()) {
-      final Optional<Host> next = this.domainCounter.getNextHost();
+      final Optional<Host> next = this.manager.getNextHost();
       if (next.isPresent()) {
 
         final String sql = "SELECT id, json FROM <table> WHERE host = ? ORDER BY modified LIMIT 1";
@@ -182,7 +182,7 @@ public class JdbcStore<T> implements IDataStore<T> {
             delete(rec.id);
             return rec.object;
           } else {
-            domainCounter.notQueued(next.get());
+            manager.notQueued(next.get());
           }
 
         } catch (SQLException e) {
@@ -199,7 +199,7 @@ public class JdbcStore<T> implements IDataStore<T> {
 
       var host = new Host(URI.create(rec.id));
       // if limit is reached, we can delete all items for that host from queue
-      if (isQueued() && !domainCounter.acceptHost(host)) {
+      if (isQueued() && !manager.acceptHost(host)) {
         executeWrite("DELETE FROM <table> WHERE host = ?", ps -> ps.setString(1, host.toString()));
 
         return Optional.empty();

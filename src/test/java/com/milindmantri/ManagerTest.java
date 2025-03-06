@@ -20,7 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-class DomainCounterTest {
+class ManagerTest {
 
   // NOTE: Ensure PG is running on local and "test" DB exists.
 
@@ -41,8 +41,8 @@ class DomainCounterTest {
   @BeforeEach
   void createTable() throws SQLException {
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement(DomainCounter.CREATE_TABLE);
-        var indexPs = con.prepareStatement(DomainCounter.CREATE_INDEX)) {
+        var ps = con.prepareStatement(Manager.CREATE_TABLE);
+        var indexPs = con.prepareStatement(Manager.CREATE_INDEX)) {
       ps.executeUpdate();
       indexPs.executeUpdate();
     }
@@ -58,14 +58,14 @@ class DomainCounterTest {
 
   @Test
   void invalidLimit() {
-    assertThrows(IllegalArgumentException.class, () -> new DomainCounter(-1, datasource));
-    assertThrows(IllegalArgumentException.class, () -> new DomainCounter(-1, null));
+    assertThrows(IllegalArgumentException.class, () -> new Manager(-1, datasource));
+    assertThrows(IllegalArgumentException.class, () -> new Manager(-1, null));
   }
 
   @Test
   void stopAfterLimitSingleHost() throws SQLException {
     // should stop after limit is reached
-    DomainCounter dc = new DomainCounter(3, datasource);
+    Manager dc = new Manager(3, datasource);
 
     assertTrue(
         IntStream.range(0, 3)
@@ -91,7 +91,7 @@ class DomainCounterTest {
       ps.executeUpdate();
     }
 
-    DomainCounter dc = new DomainCounter(3, datasource);
+    Manager dc = new Manager(3, datasource);
 
     var engine = Mockito.mock(JdbcStoreEngine.class);
     Mockito.when(engine.hasQueuedTable()).thenReturn(false);
@@ -106,12 +106,12 @@ class DomainCounterTest {
   @Test
   void noTableWhenRestoring() throws SQLException {
     dropTable();
-    assertDoesNotThrow(() -> new DomainCounter(3, datasource));
+    assertDoesNotThrow(() -> new Manager(3, datasource));
   }
 
   @Test
   void createTableOnCrawlerStart() throws SQLException {
-    var dc = new DomainCounter(1, datasource);
+    var dc = new Manager(1, datasource);
 
     // ensure no table exists
     dropTable();
@@ -133,7 +133,7 @@ class DomainCounterTest {
 
   @Test
   void insertEntryOnNewLink() throws SQLException {
-    var dc = new DomainCounter(1, datasource);
+    var dc = new Manager(1, datasource);
 
     final String link = "https://www.php.net/new-link?hello=work";
 
@@ -155,7 +155,7 @@ class DomainCounterTest {
 
   @Test
   void insertEntryOnNewLinkWithFragment() throws SQLException {
-    var dc = new DomainCounter(1, datasource);
+    var dc = new Manager(1, datasource);
 
     final String link = "https://www.php.net/new-link#fragment-data";
 
@@ -177,7 +177,7 @@ class DomainCounterTest {
 
   @Test
   void invalidProps() throws SQLException {
-    var dc = new DomainCounter(1, datasource);
+    var dc = new Manager(1, datasource);
 
     final String link = "https://www.php.net/new-link";
 
@@ -190,7 +190,7 @@ class DomainCounterTest {
 
   @Test
   void invalidProps2() throws SQLException {
-    var dc = new DomainCounter(1, datasource);
+    var dc = new Manager(1, datasource);
 
     final String link = "https://www.php.net/new-link";
 
@@ -203,7 +203,7 @@ class DomainCounterTest {
 
   @Test
   void insertEntryOnNewLink2() throws SQLException {
-    var dc = new DomainCounter(2, datasource);
+    var dc = new Manager(2, datasource);
 
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link2";
@@ -230,7 +230,7 @@ class DomainCounterTest {
 
   @Test
   void insertEntryOnNewLink2WithFragment() throws SQLException {
-    var dc = new DomainCounter(2, datasource);
+    var dc = new Manager(2, datasource);
 
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link#frag-on-same-link";
@@ -252,7 +252,7 @@ class DomainCounterTest {
 
   @Test
   void dropTableWhenCrawlingEnds() throws SQLException {
-    var dc = new DomainCounter(2, datasource);
+    var dc = new Manager(2, datasource);
     dc.accept(new CrawlerEvent.Builder(CrawlerEvent.CRAWLER_RUN_END, mockCrawler).build());
 
     try (var con = datasource.getConnection();
@@ -266,7 +266,7 @@ class DomainCounterTest {
   @Test
   void stopAfterLimitRefFilter() throws SQLException {
     // should stop after limit is reached
-    DomainCounter dc = new DomainCounter(3, datasource);
+    Manager dc = new Manager(3, datasource);
 
     assertTrue(
         IntStream.range(0, 3)
@@ -278,8 +278,8 @@ class DomainCounterTest {
 
   @Test
   void getNextHost() throws SQLException {
-    DomainCounter dc =
-        new DomainCounter(
+    Manager dc =
+        new Manager(
             3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
 
     assertTrue(dc.getNextHost().isEmpty());
@@ -287,8 +287,8 @@ class DomainCounterTest {
 
   @Test
   void getNextHostVisitedOnce() throws SQLException {
-    DomainCounter dc =
-        new DomainCounter(
+    Manager dc =
+        new Manager(
             3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
 
     assertTrue(
@@ -304,8 +304,8 @@ class DomainCounterTest {
 
   @Test
   void getNextHostLimitReached() throws SQLException {
-    DomainCounter dc =
-        new DomainCounter(
+    Manager dc =
+        new Manager(
             3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
 
     assertTrue(
@@ -319,8 +319,8 @@ class DomainCounterTest {
 
   @Test
   void getNextHostMissedOnce() throws SQLException {
-    DomainCounter dc =
-        new DomainCounter(
+    Manager dc =
+        new Manager(
             3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
 
     assertTrue(
@@ -340,8 +340,8 @@ class DomainCounterTest {
 
   @Test
   void getNextHostQueued() throws SQLException {
-    DomainCounter dc =
-        new DomainCounter(
+    Manager dc =
+        new Manager(
             3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
 
     assertTrue(

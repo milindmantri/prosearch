@@ -8,16 +8,16 @@ import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 
 public class ProCollector extends HttpCollector {
 
-  private final DomainCounter domainCounter;
+  private final Manager manager;
 
   public ProCollector(
-      final HttpCollectorConfig collectorConfig, final DomainCounter domainCounter) {
+      final HttpCollectorConfig collectorConfig, final Manager manager) {
     super(collectorConfig);
-    this.domainCounter = domainCounter;
+    this.manager = manager;
   }
 
   @Override
   protected Crawler createCrawler(final CrawlerConfig config) {
-    return new ProCrawler((HttpCrawlerConfig) config, this, this.domainCounter);
+    return new ProCrawler((HttpCrawlerConfig) config, this, this.manager);
   }
 }

@@ -44,8 +44,8 @@ class JdbcStoreTest {
   @BeforeEach
   void createTable() throws SQLException {
     try (var con = ds.getConnection();
-        var ps = con.prepareStatement(DomainCounter.CREATE_TABLE);
-        var indexPs = con.prepareStatement(DomainCounter.CREATE_INDEX)) {
+        var ps = con.prepareStatement(Manager.CREATE_TABLE);
+        var indexPs = con.prepareStatement(Manager.CREATE_INDEX)) {
       ps.executeUpdate();
       indexPs.executeUpdate();
     }
@@ -60,7 +60,7 @@ class JdbcStoreTest {
     Mockito.when(crawler.getId()).thenReturn(CRAWLER);
     Mockito.when(crawler.getCollector()).thenReturn(collector);
 
-    try (var engine = new JdbcStoreEngine(Mockito.mock(DomainCounter.class))) {
+    try (var engine = new JdbcStoreEngine(Mockito.mock(Manager.class))) {
 
       engine.setConfigProperties(new Properties(TestCommons.dbProps()));
       engine.init(crawler);
@@ -71,7 +71,7 @@ class JdbcStoreTest {
               engine,
               JdbcStore.QUEUED_STORE,
               CrawlDocInfo.class,
-              Mockito.mock(DomainCounter.class))) {
+              Mockito.mock(Manager.class))) {
 
         assertDoesNotThrow(
             () ->
@@ -96,7 +96,7 @@ class JdbcStoreTest {
     Mockito.when(crawler.getId()).thenReturn(CRAWLER);
     Mockito.when(crawler.getCollector()).thenReturn(collector);
 
-    try (var engine = new JdbcStoreEngine(Mockito.mock(DomainCounter.class))) {
+    try (var engine = new JdbcStoreEngine(Mockito.mock(Manager.class))) {
 
       engine.setConfigProperties(new Properties(TestCommons.dbProps()));
       engine.init(crawler);
@@ -107,7 +107,7 @@ class JdbcStoreTest {
               engine,
               JdbcStore.QUEUED_STORE,
               CrawlDocInfo.class,
-              Mockito.mock(DomainCounter.class))) {
+              Mockito.mock(Manager.class))) {
 
         store.save("https://sub.some.com/hello-world", new CrawlDocInfo());
 
@@ -146,7 +146,7 @@ class JdbcStoreTest {
     Mockito.when(crawler.getId()).thenReturn(CRAWLER);
     Mockito.when(crawler.getCollector()).thenReturn(collector);
 
-    try (var engine = new JdbcStoreEngine(Mockito.mock(DomainCounter.class))) {
+    try (var engine = new JdbcStoreEngine(Mockito.mock(Manager.class))) {
 
       engine.setConfigProperties(new Properties(TestCommons.dbProps()));
       engine.init(crawler);
@@ -157,7 +157,7 @@ class JdbcStoreTest {
               engine,
               JdbcStore.QUEUED_STORE,
               CrawlDocInfo.class,
-              Mockito.mock(DomainCounter.class))) {
+              Mockito.mock(Manager.class))) {
 
         store.save("https://sub.some.com/hello-world", new CrawlDocInfo());
 
@@ -180,7 +180,7 @@ class JdbcStoreTest {
     final String s1 = "http://site1.com";
     final String s2 = "https://site2.com";
 
-    DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2).map(URI::create));
+    Manager dc = new Manager(3, ds, Stream.of(s1, s2).map(URI::create));
     dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
     dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
 
@@ -223,7 +223,7 @@ class JdbcStoreTest {
     final String s1 = "http://site1.com";
     final String s2 = "https://site2.com";
 
-    DomainCounter dc = new DomainCounter(3, ds, Stream.of(s1, s2).map(URI::create));
+    Manager dc = new Manager(3, ds, Stream.of(s1, s2).map(URI::create));
     dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
     dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
 
@@ -265,7 +265,7 @@ class JdbcStoreTest {
 
     final String s1 = "http://site1.com";
 
-    DomainCounter dc = new DomainCounter(2, ds, Stream.of(s1).map(URI::create));
+    Manager dc = new Manager(2, ds, Stream.of(s1).map(URI::create));
 
     try (var engine = new JdbcStoreEngine(dc)) {
 
