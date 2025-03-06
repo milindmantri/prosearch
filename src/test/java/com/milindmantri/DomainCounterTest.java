@@ -93,6 +93,11 @@ class DomainCounterTest {
 
     DomainCounter dc = new DomainCounter(3, datasource);
 
+    var engine = Mockito.mock(JdbcStoreEngine.class);
+    Mockito.when(engine.hasQueuedTable()).thenReturn(false);
+
+    dc.restoreCount(engine);
+
     assertTrue(dc.acceptMetadata("http://host.com/3", VALID_PROPS));
 
     assertFalse(dc.acceptMetadata("http://host.com/4", VALID_PROPS));
