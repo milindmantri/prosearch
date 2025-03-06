@@ -34,9 +34,7 @@ public class ProCrawler extends HttpCrawler {
   }
 
   public ProCrawler(
-      final HttpCrawlerConfig crawlerConfig,
-      final HttpCollector collector,
-      final Manager manager) {
+      final HttpCrawlerConfig crawlerConfig, final HttpCollector collector, final Manager manager) {
     super(crawlerConfig, collector);
 
     this.manager = manager;
@@ -49,9 +47,7 @@ public class ProCrawler extends HttpCrawler {
     HttpImporterPipelineContext httpContext = new HttpImporterPipelineContext(importerContext);
 
     new ImporterQueueRejectPipeline(
-            getCrawlerConfig().isKeepDownloads(),
-            importerContext.getDocument().isOrphan(),
-      manager)
+            getCrawlerConfig().isKeepDownloads(), importerContext.getDocument().isOrphan(), manager)
         .execute(httpContext);
 
     return httpContext.getImporterResponse();
@@ -65,7 +61,14 @@ public class ProCrawler extends HttpCrawler {
     // TODO: Improve by finding diff-ed start URLs and initiating a crawl on them
 
     try {
+
+      if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
+        this.manager.dropStatsTable();
+      }
+
+      this.manager.createStatsTableIfNotExists();
       manager.restoreCount((JdbcStoreEngine) this.config.getDataStoreEngine());
+
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }

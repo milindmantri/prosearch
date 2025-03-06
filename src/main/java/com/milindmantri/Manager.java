@@ -66,6 +66,24 @@ public class Manager
 
   private static final String PG_UNDEFINED_RELATION_ERR_CODE = "42P01";
   private static final String PG_UNIQUE_VIOLATION_ERR_CODE = "23505";
+  private static final String CREATE_DOMAIN_STATS_TABLE =
+      """
+    CREATE TABLE IF NOT EXISTS
+      domain_stats (
+          host   VARCHAR NOT NULL
+        , url    VARCHAR NOT NULL
+        , length bigint  NOT NULL
+      );
+    """;
+  private static final String CREATE_DOMAIN_STATS_INDEX =
+      """
+    CREATE UNIQUE INDEX IF NOT EXISTS
+      domain_stats_idx
+    ON domain_stats (
+        host
+      , url
+    )
+    """;
 
   private final int limit;
 
@@ -286,7 +304,27 @@ public class Manager
     }
   }
 
-  private void restoreInternal(final String sql) throws SQLException {
+  void createStatsTableIfNotExists() throws SQLException {
+    try (var con = this.dataSource.getConnection();
+        var createTable = con.prepareStatement(CREATE_DOMAIN_STATS_TABLE);
+        var createIndex = con.prepareStatement(CREATE_DOMAIN_STATS_INDEX)) {
+
+      con.setAutoCommit(false);
+      createTable.executeUpdate();
+      createIndex.executeUpdate();
+
+      con.commit();
+      con.setAutoCommit(true);
+    }
+  }
+
+  void dropStatsTable() throws SQLException {
+    try (var con = this.dataSource.getConnection()) {
+      con.createStatement().executeUpdate("DROP TABLE IF EXISTS domain_stats");
+    }
+  }
+
+  void restoreInternal(final String sql) throws SQLException {
     try (var con = this.dataSource.getConnection();
         var ps = con.prepareStatement(sql)) {
 

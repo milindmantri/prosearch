@@ -99,7 +99,8 @@ class MainTest {
 
   @Test
   void createStatsTableIfNotExists() throws SQLException {
-    Main.createStatsTableIfNotExists(datasource);
+
+    new Manager(1, datasource).createStatsTableIfNotExists();
 
     String host = "http://www.example.com";
     String url = "http://www.example.com/path";

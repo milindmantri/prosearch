@@ -30,25 +30,6 @@ public class Main {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
-  private static final String CREATE_DOMAIN_STATS_TABLE =
-      """
-      CREATE TABLE IF NOT EXISTS
-        domain_stats (
-            host   VARCHAR NOT NULL
-          , url    VARCHAR NOT NULL
-          , length bigint  NOT NULL
-        );
-      """;
-
-  private static final String CREATE_DOMAIN_STATS_INDEX =
-      """
-      CREATE UNIQUE INDEX IF NOT EXISTS
-        domain_stats_idx
-      ON domain_stats (
-          host
-        , url
-      )
-      """;
 
   public static void main(String[] args)
       throws SQLException, ExecutionException, InterruptedException, IOException {
@@ -67,12 +48,6 @@ public class Main {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-
-      if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
-        dropStatsTable(dataSource);
-      }
-
-      createStatsTableIfNotExists(dataSource);
 
       int delayBetweenRuns =
           Integer.parseInt(System.getProperty("delay-hours-between-crawls", "4"));
@@ -122,25 +97,7 @@ public class Main {
     return httpServer;
   }
 
-  static void createStatsTableIfNotExists(final DataSource datasource) throws SQLException {
-    try (var con = datasource.getConnection();
-        var createTable = con.prepareStatement(CREATE_DOMAIN_STATS_TABLE);
-        var createIndex = con.prepareStatement(CREATE_DOMAIN_STATS_INDEX)) {
 
-      con.setAutoCommit(false);
-      createTable.executeUpdate();
-      createIndex.executeUpdate();
-
-      con.commit();
-      con.setAutoCommit(true);
-    }
-  }
-
-  static void dropStatsTable(final DataSource datasource) throws SQLException {
-    try (var con = datasource.getConnection()) {
-      con.createStatement().executeUpdate("DROP TABLE IF EXISTS domain_stats");
-    }
-  }
 
   static com.norconex.commons.lang.map.Properties dbProps() {
 

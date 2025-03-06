@@ -17,13 +17,13 @@ class StatisticsHttpHandlerTest {
 
   @AfterAll
   static void close() throws SQLException {
-    Main.dropStatsTable(datasource);
+    new Manager(1, datasource).dropStatsTable();
     datasource.close();
   }
 
   @BeforeAll
   static void create() throws SQLException {
-    Main.createStatsTableIfNotExists(datasource);
+    new Manager(1, datasource).createStatsTableIfNotExists();
   }
 
   @BeforeEach

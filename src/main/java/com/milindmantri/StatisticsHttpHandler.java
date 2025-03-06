@@ -29,6 +29,7 @@ public record StatisticsHttpHandler(DataSource datasource, Set<Host> startHosts)
 
   private static final Logger LOGGER = LoggerFactory.getLogger(StatisticsHttpHandler.class);
 
+  // TODO: better positioned in Manager
   static final String GET_STATS_QUERY =
       """
     SELECT

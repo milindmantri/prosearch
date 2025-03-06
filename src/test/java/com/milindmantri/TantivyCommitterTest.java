@@ -386,7 +386,7 @@ class TantivyCommitterTest {
 
   @BeforeEach
   void createTable() throws SQLException {
-    Main.createStatsTableIfNotExists(datasource);
+    new Manager(1, datasource).createStatsTableIfNotExists();
   }
 
   @AfterEach
