@@ -84,9 +84,8 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setIgnoreSitemap(true);
 
     try {
-      var domainCounter =
-          new Manager(PER_HOST_CRAWLING_LIMIT, this.datasource, this.startUrls.stream());
-      try (JdbcStoreEngine engine = new JdbcStoreEngine(domainCounter)) {
+      var manager = new Manager(PER_HOST_CRAWLING_LIMIT, this.datasource, this.startUrls.stream());
+      try (JdbcStoreEngine engine = new JdbcStoreEngine(manager)) {
 
         engine.setConfigProperties(Main.dbProps());
         crawlerConfig.setDataStoreEngine(engine);
@@ -97,17 +96,17 @@ public final class CrawlerRunner implements Runnable {
 
         crawlerConfig.setLinkExtractors(htmlLinkExtractor);
 
-        crawlerConfig.setReferenceFilters(domainCounter);
-        crawlerConfig.setEventListeners(domainCounter);
-        crawlerConfig.setMetadataFilters(domainCounter);
-        crawlerConfig.setHttpFetchers(domainCounter.httpFetcher());
-        crawlerConfig.setDelayResolver(domainCounter.delayResolver());
+        crawlerConfig.setReferenceFilters(manager);
+        crawlerConfig.setEventListeners(manager);
+        crawlerConfig.setMetadataFilters(manager);
+        crawlerConfig.setHttpFetchers(manager.httpFetcher());
+        crawlerConfig.setDelayResolver(manager.delayResolver());
 
-        crawlerConfig.setCommitters(new TantivyCommitter(this.client, this.datasource));
+        crawlerConfig.setCommitters(new TantivyCommitter(this.client, manager));
 
         config.setCrawlerConfigs(crawlerConfig);
 
-        ProCollector spider = new ProCollector(config, domainCounter);
+        ProCollector spider = new ProCollector(config, manager);
 
         if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
           spider.clean();

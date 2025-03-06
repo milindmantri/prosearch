@@ -24,6 +24,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.PrimitiveIterator;
 import java.util.Set;
@@ -464,5 +465,27 @@ public class Manager
   /** Call when host is not found when looking in queue */
   public void notQueued(final Host host) {
     this.notQueuedHosts.add(host);
+  }
+
+  void insertIntoDomainStats(final URI uri, final long length) throws SQLException {
+    try (var con = this.dataSource.getConnection();
+        var ps =
+            con.prepareStatement("INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
+      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
+
+      ps.setString(2, Manager.removeScheme(uri));
+      ps.setLong(3, length);
+      ps.executeUpdate();
+    }
+  }
+
+  void deleteFromDomainStats(final URI uri) throws SQLException {
+    try (var con = this.dataSource.getConnection();
+        var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
+      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
+
+      ps.setString(2, Manager.removeScheme(uri));
+      ps.executeUpdate();
+    }
   }
 }

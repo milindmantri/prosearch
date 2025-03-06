@@ -14,27 +14,25 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.sql.DataSource;
 
 public class TantivyCommitter extends AbstractCommitter {
 
   private final TantivyClient client;
-  private final DataSource datasource;
+  private final Manager manager;
 
-  public TantivyCommitter(final TantivyClient client, final DataSource datasource) {
+  public TantivyCommitter(final TantivyClient client, final Manager manager) {
     if (client == null) {
       throw new IllegalArgumentException("client must not be null.");
     }
 
-    if (datasource == null) {
-      throw new IllegalArgumentException("datasource must not be null.");
+    if (manager == null) {
+      throw new IllegalArgumentException("manager must not be null.");
     }
 
     this.client = client;
-    this.datasource = datasource;
+    this.manager = manager;
   }
 
   @Override
@@ -97,8 +95,8 @@ public class TantivyCommitter extends AbstractCommitter {
       }
 
       if (deleteResult && maybeIndexedBytesLength.isPresent()) {
-        deleteFromDomainStats(uri);
-        insertIntoDomainStats(uri, maybeIndexedBytesLength.get());
+        this.manager.deleteFromDomainStats(uri);
+        this.manager.insertIntoDomainStats(uri, maybeIndexedBytesLength.get());
       } else {
         throw new CommitterException(
             String.format(
@@ -123,7 +121,7 @@ public class TantivyCommitter extends AbstractCommitter {
         throw new CommitterException(
             "Could not process delete request for %s".formatted(deleteRequest));
       } else {
-        deleteFromDomainStats(uri);
+        this.manager.deleteFromDomainStats(uri);
       }
     } catch (IOException | InterruptedException | SQLException e) {
       throw new RuntimeException(e);
@@ -152,27 +150,5 @@ public class TantivyCommitter extends AbstractCommitter {
 
   private static String inputStreamReader(final InputStream is) {
     return new BufferedReader(new InputStreamReader(is)).lines().collect(Collectors.joining());
-  }
-
-  private void insertIntoDomainStats(final URI uri, final long length) throws SQLException {
-    try (var con = this.datasource.getConnection();
-        var ps =
-            con.prepareStatement("INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
-      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
-
-      ps.setString(2, Manager.removeScheme(uri));
-      ps.setLong(3, length);
-      ps.executeUpdate();
-    }
-  }
-
-  private void deleteFromDomainStats(final URI uri) throws SQLException {
-    try (var con = this.datasource.getConnection();
-        var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
-      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
-
-      ps.setString(2, Manager.removeScheme(uri));
-      ps.executeUpdate();
-    }
   }
 }

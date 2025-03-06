@@ -27,6 +27,7 @@ import org.mockito.Mockito;
 class TantivyCommitterTest {
 
   private static final HikariDataSource datasource = TestCommons.createTestDataSource();
+  private static final Manager manager = new Manager(1, datasource);
 
   @Test
   void doUpsert() throws CommitterException, IOException, InterruptedException {
@@ -35,7 +36,7 @@ class TantivyCommitterTest {
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -62,7 +63,7 @@ class TantivyCommitterTest {
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
 
       var props =
           new Properties(
@@ -96,7 +97,7 @@ class TantivyCommitterTest {
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -118,7 +119,7 @@ class TantivyCommitterTest {
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -139,7 +140,7 @@ class TantivyCommitterTest {
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any())).thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
       var emptyProps = new Properties();
 
       assertDoesNotThrow(
@@ -163,7 +164,7 @@ class TantivyCommitterTest {
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any())).thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
       var emptyProps = new Properties();
 
       assertDoesNotThrow(
@@ -190,7 +191,7 @@ class TantivyCommitterTest {
                 Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(Optional.of(7L));
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
       var props = new Properties();
       props.add("description", "meta description");
 
@@ -213,7 +214,7 @@ class TantivyCommitterTest {
 
   @Test
   void nullClient() {
-    assertThrows(IllegalArgumentException.class, () -> new TantivyCommitter(null, datasource));
+    assertThrows(IllegalArgumentException.class, () -> new TantivyCommitter(null, manager));
   }
 
   @Test
@@ -227,7 +228,7 @@ class TantivyCommitterTest {
   void nullUpsert() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> new TantivyCommitter(Mockito.mock(TantivyClient.class), datasource).doUpsert(null));
+        () -> new TantivyCommitter(Mockito.mock(TantivyClient.class), manager).doUpsert(null));
   }
 
   @Test
@@ -235,7 +236,7 @@ class TantivyCommitterTest {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -250,7 +251,7 @@ class TantivyCommitterTest {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(false);
 
-    try (var tc = new TantivyCommitter(client, datasource)) {
+    try (var tc = new TantivyCommitter(client, manager)) {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
@@ -270,7 +271,7 @@ class TantivyCommitterTest {
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(Optional.of(6L));
 
-    try (var tc = new TantivyCommitter(client, datasource);
+    try (var tc = new TantivyCommitter(client, manager);
         var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
 
@@ -302,7 +303,7 @@ class TantivyCommitterTest {
     Mockito.when(client.indexAndLength(Mockito.any(), Mockito.any(), Mockito.any()))
         .thenReturn(Optional.of(6L));
 
-    try (var tc = new TantivyCommitter(client, datasource);
+    try (var tc = new TantivyCommitter(client, manager);
         var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
 
@@ -338,7 +339,7 @@ class TantivyCommitterTest {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
 
-    try (var tc = new TantivyCommitter(client, datasource);
+    try (var tc = new TantivyCommitter(client, manager);
         var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
 
@@ -365,7 +366,7 @@ class TantivyCommitterTest {
     var client = Mockito.mock(TantivyClient.class);
     Mockito.when(client.delete(Mockito.any())).thenReturn(true);
 
-    try (var tc = new TantivyCommitter(client, datasource);
+    try (var tc = new TantivyCommitter(client, manager);
         var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT * FROM domain_stats")) {
 
@@ -386,7 +387,7 @@ class TantivyCommitterTest {
 
   @BeforeEach
   void createTable() throws SQLException {
-    new Manager(1, datasource).createStatsTableIfNotExists();
+    manager.createStatsTableIfNotExists();
   }
 
   @AfterEach
