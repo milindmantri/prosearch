@@ -293,18 +293,19 @@ class JdbcStoreTest {
         dc.acceptMetadata(s1 + "/1", TestCommons.VALID_PROPS);
 
         assertTrue(store.deleteFirst().isEmpty());
-        assertTrue(store.deleteFirst().isEmpty());
 
-        TestCommons.query(
-            ds,
-            "SELECT count(*) from %s".formatted(QUEUE_TABLE),
-            rs -> {
-              try {
-                return rs.next() ? rs.getInt(1) : 0;
-              } catch (SQLException e) {
-                throw new RuntimeException(e);
-              }
-            });
+        assertEquals(
+            Integer.valueOf(0),
+            TestCommons.query(
+                ds,
+                "SELECT count(*) from %s".formatted(QUEUE_TABLE),
+                rs -> {
+                  try {
+                    return rs.next() ? rs.getInt(1) : 0;
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
       }
     }
   }

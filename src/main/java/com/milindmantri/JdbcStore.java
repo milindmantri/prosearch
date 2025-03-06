@@ -197,7 +197,13 @@ public class JdbcStore<T> implements IDataStore<T> {
     if (!rec.isEmpty()) {
       delete(rec.id);
 
-      return rec.object.filter(_ -> domainCounter.acceptHost(new Host(URI.create(rec.id))));
+      var host = new Host(URI.create(rec.id));
+      // if limit is reached, we can delete all items for that host from queue
+      if (isQueued() && !domainCounter.acceptHost(host)) {
+        executeWrite("DELETE FROM <table> WHERE host = ?", ps -> ps.setString(1, host.toString()));
+
+        return Optional.empty();
+      }
     }
     return rec.object;
   }
