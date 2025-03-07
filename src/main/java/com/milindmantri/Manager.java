@@ -24,7 +24,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.PrimitiveIterator;
 import java.util.Set;
@@ -420,7 +419,7 @@ public class Manager
             local);
 
         if (local) {
-          rollbackLocal(host);
+          rollbackLocalInsert(host);
         }
 
         con.rollback();
@@ -437,15 +436,7 @@ public class Manager
     return false;
   }
 
-  void deleteProcessed(final URI uri) throws SQLException {
-    try (var con = this.dataSource.getConnection();
-        var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
-      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
-
-      ps.setString(2, Manager.removeScheme(uri));
-      ps.executeUpdate();
-    }
-
+  boolean deleteProcessed(final URI uri) throws SQLException {
     int rows = 0;
     boolean local = false;
     final Host host = new Host(uri);
@@ -463,14 +454,17 @@ public class Manager
         if (rows == 0) {
           LOGGER.error("DB delete failed for key {}, zero rows returned.", new Host(uri));
           con.rollback();
+          return false;
         }
 
         local = localDelete(host);
         if (!local) {
           con.rollback();
+          return false;
         }
 
         con.commit();
+        return true;
 
       } catch (SQLException e) {
 
@@ -480,7 +474,7 @@ public class Manager
             local);
 
         if (local) {
-          rollbackLocal(host);
+          rollbackLocalDelete(host);
         }
 
         con.rollback();
@@ -491,8 +485,12 @@ public class Manager
     }
   }
 
-  private void rollbackLocal(final Host host) {
+  private void rollbackLocalInsert(final Host host) {
     this.count.get(host).decrementAndGet();
+  }
+
+  private void rollbackLocalDelete(final Host host) {
+    this.count.get(host).incrementAndGet();
   }
 
   private boolean localInsert(final Host host) {
@@ -518,6 +516,14 @@ public class Manager
     } else {
       LOGGER.error("count must contain host {} but was missing", host);
       return false;
+    }
+  }
+
+  public int count(final Host host) {
+    if (count.containsKey(host)) {
+      return count.get(host).get();
+    } else {
+      return 0;
     }
   }
 }

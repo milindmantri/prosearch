@@ -9,6 +9,7 @@ import com.norconex.collector.core.doc.CrawlDocInfo;
 import com.norconex.commons.lang.event.Event;
 import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -412,6 +413,364 @@ class ManagerTest {
     assertEquals(new Host("site1.com"), dc.getNextHost().get());
     assertEquals(new Host("site2.com"), dc.getNextHost().get());
     assertEquals(new Host("site1.com"), dc.getNextHost().get());
+  }
+
+  @Test
+  void saveProcessedDuplicateUrl() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+    assertTrue(dc.saveProcessed(URI.create(url), 0));
+    assertFalse(dc.saveProcessed(URI.create(url), 0));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(1, rs.getInt(1));
+    }
+
+    assertEquals(1, dc.count(new Host("example.com")));
+  }
+
+  @Test
+  void saveProcessedInvalidUri() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+    assertThrows(
+        IllegalArgumentException.class, () -> dc.saveProcessed(URI.create(":invalid:/uri"), 0));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(0, rs.getInt(1));
+    }
+
+    assertEquals(0, dc.count(new Host("example.com")));
+  }
+
+  @Test
+  void saveProcessedWithoutQueueing() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    assertFalse(dc.saveProcessed(URI.create(url), 0));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(0, rs.getInt(1));
+    }
+
+    assertEquals(0, dc.count(new Host("example.com")));
+  }
+
+  @Test
+  void saveProcessedWhenLimitReached() throws SQLException {
+    var dc = new Manager(2, datasource);
+    var host = "example.com";
+
+    // First two URLs should succeed
+    assertTrue(
+        IntStream.rangeClosed(1, 2)
+            .mapToObj(i -> "http://" + host + "/page" + i)
+            .peek(s -> dc.accept(qEvent(s)))
+            .allMatch(
+                s -> {
+                  try {
+                    return dc.saveProcessed(URI.create(s), 0);
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
+
+    // Third URL should fail
+    String url = "http://" + host + "/page3";
+    dc.accept(qEvent(url));
+    assertFalse(dc.saveProcessed(URI.create(url), 0));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(2, rs.getInt(1));
+    }
+
+    assertEquals(2, dc.count(new Host(host)));
+  }
+
+  @Test
+  void saveProcessedWithDatabaseError() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+
+    // Drop table to simulate database error
+    dropTable();
+
+    assertThrows(SQLException.class, () -> dc.saveProcessed(URI.create(url), 0));
+    assertEquals(0, dc.count(new Host("example.com")));
+  }
+
+  @Test
+  void saveProcessedNullUri() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+    assertThrows(NullPointerException.class, () -> dc.saveProcessed(null, 0));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(0, rs.getInt(1));
+    }
+
+    assertEquals(0, dc.count(new Host("example.com")));
+  }
+
+  @Test
+  void saveProcessedMultipleHosts() throws SQLException {
+    var dc = new Manager(3, datasource);
+
+    // First host
+    String url1 = "http://example1.com/page";
+    dc.accept(qEvent(url1));
+    assertTrue(dc.saveProcessed(URI.create(url1), 0));
+
+    // Second host
+    String url2 = "http://example2.com/page";
+    dc.accept(qEvent(url2));
+    assertTrue(dc.saveProcessed(URI.create(url2), 0));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(2, rs.getInt(1));
+    }
+
+    assertEquals(1, dc.count(new Host("example1.com")));
+    assertEquals(1, dc.count(new Host("example2.com")));
+  }
+
+  @Test
+  void saveProcessedRollbackOnError() throws SQLException {
+    var ds = Mockito.spy(datasource);
+    try (var con = datasource.getConnection()) {
+
+      Connection spyCon = Mockito.spy(con);
+      Mockito.when(ds.getConnection()).thenReturn(spyCon);
+
+      Mockito.doThrow(new SQLException()).when(spyCon).commit();
+
+      var dc = new Manager(3, ds);
+
+      String url = "http://example.com/page";
+
+      dc.accept(qEvent(url));
+
+      assertThrows(SQLException.class, () -> dc.saveProcessed(URI.create(url), 0));
+      assertEquals(0, dc.count(new Host("example.com"))); // Should rollback local count
+    }
+  }
+
+  @Test
+  void deleteProcessedBasicCase() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+    assertTrue(dc.saveProcessed(URI.create(url), 0));
+    assertEquals(1, dc.count(new Host("example.com")));
+
+    dc.deleteProcessed(URI.create(url));
+    assertEquals(0, dc.count(new Host("example.com")));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(0, rs.getInt(1));
+    }
+  }
+
+  @Test
+  void deleteProcessedNonExistentUrl() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+    String nonExistentUrl = "http://example.com/nonexistent";
+
+    dc.accept(qEvent(url));
+    assertTrue(dc.saveProcessed(URI.create(url), 0));
+    assertEquals(1, dc.count(new Host("example.com")));
+
+    dc.deleteProcessed(URI.create(nonExistentUrl));
+    assertEquals(1, dc.count(new Host("example.com")));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(1, rs.getInt(1));
+    }
+  }
+
+  @Test
+  void deleteProcessedMultipleUrls() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url1 = "http://example.com/page1";
+    String url2 = "http://example.com/page2";
+
+    dc.accept(qEvent(url1));
+    dc.accept(qEvent(url2));
+    assertTrue(dc.saveProcessed(URI.create(url1), 0));
+    assertTrue(dc.saveProcessed(URI.create(url2), 0));
+    assertEquals(2, dc.count(new Host("example.com")));
+
+    dc.deleteProcessed(URI.create(url1));
+    assertEquals(1, dc.count(new Host("example.com")));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(1, rs.getInt(1));
+    }
+  }
+
+  @Test
+  void deleteProcessedDatabaseError() throws SQLException {
+    var ds = Mockito.spy(datasource);
+    try (var con = datasource.getConnection()) {
+
+      var dc = new Manager(3, ds);
+      String url = "http://example.com/page";
+
+      dc.accept(qEvent(url));
+      assertTrue(dc.saveProcessed(URI.create(url), 0));
+      assertEquals(1, dc.count(new Host("example.com")));
+
+      Connection spyCon = Mockito.spy(con);
+      Mockito.when(ds.getConnection()).thenReturn(spyCon);
+      Mockito.doThrow(new SQLException()).when(spyCon).commit();
+
+      assertThrows(SQLException.class, () -> dc.deleteProcessed(URI.create(url)));
+      assertEquals(1, dc.count(new Host("example.com"))); // Should maintain count on error
+
+      try (var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+        var rs = ps.executeQuery();
+        assertTrue(rs.next());
+        assertEquals(1, rs.getInt(1));
+      }
+    }
+  }
+
+  @Test
+  void deleteProcessedWithNullUri() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+    assertTrue(dc.saveProcessed(URI.create(url), 0));
+    assertEquals(1, dc.count(new Host("example.com")));
+
+    assertThrows(NullPointerException.class, () -> dc.deleteProcessed(null));
+    assertEquals(1, dc.count(new Host("example.com"))); // Should maintain count
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(1, rs.getInt(1));
+    }
+  }
+
+  @Test
+  void deleteProcessedWithInvalidUri() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+    assertTrue(dc.saveProcessed(URI.create(url), 0));
+    assertEquals(1, dc.count(new Host("example.com")));
+
+    assertThrows(
+        IllegalArgumentException.class, () -> dc.deleteProcessed(URI.create(":invalid://uri")));
+    assertEquals(1, dc.count(new Host("example.com"))); // Should maintain count
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(1, rs.getInt(1));
+    }
+  }
+
+  @Test
+  void deleteProcessedWithTableDrop() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+    assertTrue(dc.saveProcessed(URI.create(url), 0));
+    assertEquals(1, dc.count(new Host("example.com")));
+
+    dropTable();
+
+    assertThrows(SQLException.class, () -> dc.deleteProcessed(URI.create(url)));
+    assertEquals(1, dc.count(new Host("example.com"))); // Should maintain count on error
+  }
+
+  @Test
+  void deleteProcessedMultipleHosts() throws SQLException {
+    var dc = new Manager(3, datasource);
+    String url1 = "http://example1.com/page";
+    String url2 = "http://example2.com/page";
+
+    dc.accept(qEvent(url1));
+    dc.accept(qEvent(url2));
+    assertTrue(dc.saveProcessed(URI.create(url1), 0));
+    assertTrue(dc.saveProcessed(URI.create(url2), 0));
+
+    assertEquals(1, dc.count(new Host("example1.com")));
+    assertEquals(1, dc.count(new Host("example2.com")));
+
+    dc.deleteProcessed(URI.create(url1));
+    assertEquals(0, dc.count(new Host("example1.com")));
+    assertEquals(1, dc.count(new Host("example2.com")));
+
+    try (var con = datasource.getConnection();
+        var ps = con.prepareStatement("SELECT COUNT(*) FROM domain_stats")) {
+      var rs = ps.executeQuery();
+      assertTrue(rs.next());
+      assertEquals(1, rs.getInt(1));
+    }
+  }
+
+  @Test
+  void deleteWithoutSave() throws SQLException {
+
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    dc.accept(qEvent(url));
+
+    assertFalse(dc.deleteProcessed(URI.create(url)));
+  }
+
+  @Test
+  void deleteWithoutAccept() throws SQLException {
+
+    var dc = new Manager(3, datasource);
+    String url = "http://example.com/page";
+
+    assertFalse(dc.deleteProcessed(URI.create(url)));
   }
 
   static Event qEvent(String link) {
