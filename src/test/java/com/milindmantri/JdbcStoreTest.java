@@ -1,5 +1,6 @@
 package com.milindmantri;
 
+import static com.milindmantri.ManagerTest.qEvent;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,6 +10,7 @@ import com.norconex.collector.core.crawler.Crawler;
 import com.norconex.collector.core.doc.CrawlDocInfo;
 import com.norconex.commons.lang.map.Properties;
 import com.zaxxer.hikari.HikariDataSource;
+import java.io.Closeable;
 import java.net.URI;
 import java.sql.SQLException;
 import java.util.stream.Stream;
@@ -36,7 +38,7 @@ class JdbcStoreTest {
     TestCommons.exec(
         ds,
         """
-  DROP TABLE %s, host_count;
+  DROP TABLE %s, domain_stats;
   """
             .formatted(QUEUE_TABLE));
   }
@@ -44,8 +46,8 @@ class JdbcStoreTest {
   @BeforeEach
   void createTable() throws SQLException {
     try (var con = ds.getConnection();
-        var ps = con.prepareStatement(Manager.CREATE_TABLE);
-        var indexPs = con.prepareStatement(Manager.CREATE_INDEX)) {
+        var ps = con.prepareStatement(Manager.CREATE_DOMAIN_STATS_TABLE);
+        var indexPs = con.prepareStatement(Manager.CREATE_DOMAIN_STATS_INDEX)) {
       ps.executeUpdate();
       indexPs.executeUpdate();
     }
@@ -53,87 +55,50 @@ class JdbcStoreTest {
 
   @Test
   void queuedTableWithHost() {
-    Crawler crawler = Mockito.mock(Crawler.class);
-    Collector collector = Mockito.mock(Collector.class);
 
-    Mockito.when(collector.getId()).thenReturn(COLLECTOR);
-    Mockito.when(crawler.getId()).thenReturn(CRAWLER);
-    Mockito.when(crawler.getCollector()).thenReturn(collector);
-
-    try (var engine = new JdbcStoreEngine(Mockito.mock(Manager.class))) {
-
-      engine.setConfigProperties(new Properties(TestCommons.dbProps()));
-      engine.init(crawler);
-
-      // creating store should auto create table
-      try (var _ =
-          new JdbcStore<>(
-              engine,
-              JdbcStore.QUEUED_STORE,
-              CrawlDocInfo.class,
-              Mockito.mock(Manager.class))) {
-
-        assertDoesNotThrow(
-            () ->
-                TestCommons.exec(
-                    ds,
-                    """
+    // creating store should auto create table
+    try (var es = EngineStore.queueStore(Mockito.mock(Manager.class))) {
+      assertDoesNotThrow(
+          () ->
+              TestCommons.exec(
+                  ds,
+                  """
       INSERT INTO %s (id, host, modified, json)
       VALUES ('http://some.com', 'some.com', now(), '{}')
       """
-                        .formatted(QUEUE_TABLE)));
-      }
+                      .formatted(QUEUE_TABLE)));
     }
   }
 
   @Test
   void insert() {
 
-    Crawler crawler = Mockito.mock(Crawler.class);
-    Collector collector = Mockito.mock(Collector.class);
+    try (var es = EngineStore.queueStore(Mockito.mock(Manager.class))) {
 
-    Mockito.when(collector.getId()).thenReturn(COLLECTOR);
-    Mockito.when(crawler.getId()).thenReturn(CRAWLER);
-    Mockito.when(crawler.getCollector()).thenReturn(collector);
+      es.store().save("https://sub.some.com/hello-world", new CrawlDocInfo());
 
-    try (var engine = new JdbcStoreEngine(Mockito.mock(Manager.class))) {
-
-      engine.setConfigProperties(new Properties(TestCommons.dbProps()));
-      engine.init(crawler);
-
-      // creating store should auto create table
-      try (var store =
-          new JdbcStore<>(
-              engine,
-              JdbcStore.QUEUED_STORE,
-              CrawlDocInfo.class,
-              Mockito.mock(Manager.class))) {
-
-        store.save("https://sub.some.com/hello-world", new CrawlDocInfo());
-
-        boolean result =
-            TestCommons.<Boolean>query(
-                ds,
-                """
+      boolean result =
+          TestCommons.<Boolean>query(
+              ds,
+              """
         SELECT id, host FROM %s
         """
-                    .formatted(QUEUE_TABLE),
-                rs -> {
-                  try {
-                    assertTrue(rs.next());
-                    assertEquals("https://sub.some.com/hello-world", rs.getString(1));
-                    assertEquals("sub.some.com", rs.getString(2));
+                  .formatted(QUEUE_TABLE),
+              rs -> {
+                try {
+                  assertTrue(rs.next());
+                  assertEquals("https://sub.some.com/hello-world", rs.getString(1));
+                  assertEquals("sub.some.com", rs.getString(2));
 
-                    return true;
-                  } catch (SQLException ex) {
-                    throw new RuntimeException(ex);
-                  }
-                });
+                  return true;
+                } catch (SQLException ex) {
+                  throw new RuntimeException(ex);
+                }
+              });
 
-        assertTrue(result);
-      } catch (SQLException e) {
-        throw new RuntimeException(e);
-      }
+      assertTrue(result);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -154,10 +119,7 @@ class JdbcStoreTest {
       // creating store should auto create table
       try (var store =
           new JdbcStore<>(
-              engine,
-              JdbcStore.QUEUED_STORE,
-              CrawlDocInfo.class,
-              Mockito.mock(Manager.class))) {
+              engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, Mockito.mock(Manager.class))) {
 
         store.save("https://sub.some.com/hello-world", new CrawlDocInfo());
 
@@ -169,32 +131,27 @@ class JdbcStoreTest {
 
   @Test
   void deleteFirstNextHost() throws SQLException {
-    Crawler crawler = Mockito.mock(Crawler.class);
-    Collector collector = Mockito.mock(Collector.class);
-
-    Mockito.when(collector.getId()).thenReturn(COLLECTOR);
-    Mockito.when(crawler.getId()).thenReturn(CRAWLER);
-    Mockito.when(crawler.getCollector()).thenReturn(collector);
-
-    // TODO: Add Host type and move increment to other function of DomainCounter
     final String s1 = "http://site1.com";
     final String s2 = "https://site2.com";
 
     Manager dc = new Manager(3, ds, Stream.of(s1, s2).map(URI::create));
-    dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
-    dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
+    Stream.of(s1, s2)
+        .peek(s -> dc.accept(qEvent(s)))
+        .forEach(
+            s -> {
+              try {
+                dc.insertIntoDomainStats(URI.create(s), 0);
+              } catch (SQLException e) {
+                throw new RuntimeException(e);
+              }
+            });
 
-    try (var engine = new JdbcStoreEngine(dc)) {
-
-      engine.setConfigProperties(new Properties(TestCommons.dbProps()));
-      engine.init(crawler);
-
+    try (var es = EngineStore.queueStore(dc)) {
       // creating store should auto create table
-      try (var store = new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
 
-        TestCommons.exec(
-            ds,
-            """
+      TestCommons.exec(
+          ds,
+          """
       INSERT INTO %1$s (id, host, modified, json)
       VALUES
       ('%2$s/1', '%3$s', now(), '{"reference": "%2$s/1"}'),
@@ -202,82 +159,63 @@ class JdbcStoreTest {
       ('%4$s/3', '%5$s', now(), '{"reference": "%4$s/3"}'),
       ('%4$s/4', '%5$s', now() + interval '1 second', '{"reference": "%4$s/4"}')
       """
-                .formatted(
-                    QUEUE_TABLE, s1, new Host(URI.create(s1)), s2, new Host(URI.create(s2))));
+              .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1)), s2, new Host(URI.create(s2))));
 
-        assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
-        assertEquals(s2 + "/3", store.deleteFirst().get().getReference());
-      }
+      assertEquals(s1 + "/1", es.store().deleteFirst().get().getReference());
+      assertEquals(s2 + "/3", es.store().deleteFirst().get().getReference());
     }
   }
 
   @Test
   void deleteFirstNextHostNotQueued() throws SQLException {
-    Crawler crawler = Mockito.mock(Crawler.class);
-    Collector collector = Mockito.mock(Collector.class);
-
-    Mockito.when(collector.getId()).thenReturn(COLLECTOR);
-    Mockito.when(crawler.getId()).thenReturn(CRAWLER);
-    Mockito.when(crawler.getCollector()).thenReturn(collector);
 
     final String s1 = "http://site1.com";
     final String s2 = "https://site2.com";
 
     Manager dc = new Manager(3, ds, Stream.of(s1, s2).map(URI::create));
-    dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
-    dc.acceptMetadata(s2, TestCommons.VALID_PROPS);
+    Stream.of(s1, s2)
+        .peek(s -> dc.accept(qEvent(s)))
+        .forEach(
+            s -> {
+              try {
+                dc.insertIntoDomainStats(URI.create(s), 0);
+              } catch (SQLException e) {
+                throw new RuntimeException(e);
+              }
+            });
 
-    try (var engine = new JdbcStoreEngine(dc)) {
-
-      engine.setConfigProperties(new Properties(TestCommons.dbProps()));
-      engine.init(crawler);
-
-      // creating store should auto create table
-      try (var store = new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
-
-        TestCommons.exec(
-            ds,
-            """
+    try (var es = EngineStore.queueStore(dc)) {
+      TestCommons.exec(
+          ds,
+          """
       INSERT INTO %1$s (id, host, modified, json)
       VALUES
       ('%2$s/1', '%3$s', now(), '{"reference": "%2$s/1"}'),
       ('%2$s/2', '%3$s', now() + interval '1 second', '{"reference": "%2$s/2"}')
       """
-                .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
+              .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
 
-        assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
-        assertEquals(s1 + "/2", store.deleteFirst().get().getReference());
+      assertEquals(s1 + "/1", es.store().deleteFirst().get().getReference());
+      assertEquals(s1 + "/2", es.store().deleteFirst().get().getReference());
 
-        assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
-        assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
-      }
+      assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
+      assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
     }
   }
 
   @Test
   void deleteFirstNextHostLimitReached() throws SQLException {
-    Crawler crawler = Mockito.mock(Crawler.class);
-    Collector collector = Mockito.mock(Collector.class);
-
-    Mockito.when(collector.getId()).thenReturn(COLLECTOR);
-    Mockito.when(crawler.getId()).thenReturn(CRAWLER);
-    Mockito.when(crawler.getCollector()).thenReturn(collector);
-
     final String s1 = "http://site1.com";
 
     Manager dc = new Manager(2, ds, Stream.of(s1).map(URI::create));
+    dc.accept(qEvent(s1));
 
-    try (var engine = new JdbcStoreEngine(dc)) {
+    try (var es = EngineStore.queueStore(dc)) {
+      var store = es.store();
 
-      engine.setConfigProperties(new Properties(TestCommons.dbProps()));
-      engine.init(crawler);
-
-      // creating store should auto create table
-      try (var store = new JdbcStore<>(engine, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, dc)) {
-
-        TestCommons.exec(
-            ds,
-            """
+      TestCommons.exec(
+          ds,
+          """
       INSERT INTO %1$s (id, host, modified, json)
       VALUES
       ('%2$s',   '%3$s', now(),                       '{"reference": "%2$s"}'),
@@ -285,28 +223,54 @@ class JdbcStoreTest {
       ('%2$s/2', '%3$s', now() + interval '2 second', '{"reference": "%2$s/3"}'),
       ('%2$s/3', '%3$s', now() + interval '3 second', '{"reference": "%2$s/4"}')
       """
-                .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
+              .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
 
-        assertEquals(s1, store.deleteFirst().get().getReference());
-        dc.acceptMetadata(s1, TestCommons.VALID_PROPS);
-        assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
-        dc.acceptMetadata(s1 + "/1", TestCommons.VALID_PROPS);
+      assertEquals(s1, store.deleteFirst().get().getReference());
+      dc.insertIntoDomainStats(URI.create(s1), 0);
+      assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
+      dc.insertIntoDomainStats(URI.create(s1 + "/1"), 0);
 
-        assertTrue(store.deleteFirst().isEmpty());
+      assertTrue(store.deleteFirst().isEmpty());
 
-        assertEquals(
-            Integer.valueOf(0),
-            TestCommons.query(
-                ds,
-                "SELECT count(*) from %s".formatted(QUEUE_TABLE),
-                rs -> {
-                  try {
-                    return rs.next() ? rs.getInt(1) : 0;
-                  } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                  }
-                }));
-      }
+      assertEquals(
+          Integer.valueOf(0),
+          TestCommons.query(
+              ds,
+              "SELECT count(*) from %s".formatted(QUEUE_TABLE),
+              rs -> {
+                try {
+                  return rs.next() ? rs.getInt(1) : 0;
+                } catch (SQLException e) {
+                  throw new RuntimeException(e);
+                }
+              }));
+    }
+  }
+
+  record EngineStore(JdbcStoreEngine engine, JdbcStore<CrawlDocInfo> store) implements Closeable {
+
+    @Override
+    public void close() {
+      this.engine.close();
+      this.store.close();
+    }
+
+    static EngineStore queueStore(final Manager m) {
+
+      Crawler crawler = Mockito.mock(Crawler.class);
+      Collector collector = Mockito.mock(Collector.class);
+
+      Mockito.when(collector.getId()).thenReturn(JdbcStoreTest.COLLECTOR);
+      Mockito.when(crawler.getId()).thenReturn(JdbcStoreTest.CRAWLER);
+      Mockito.when(crawler.getCollector()).thenReturn(collector);
+
+      var e = new JdbcStoreEngine(m);
+      e.setConfigProperties(new Properties(TestCommons.dbProps()));
+      e.init(crawler);
+
+      var store = new JdbcStore<>(e, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, m);
+
+      return new EngineStore(e, store);
     }
   }
 }

@@ -46,28 +46,9 @@ public class Manager
 
   private static final List<IMetadataFilter> CONTENT_TYPE_FILTERS = getTextOnlyMetadataFilters();
 
-  // Visible to tests
-  static final String CREATE_TABLE =
-      """
-      CREATE TABLE IF NOT EXISTS
-        host_count
-      (
-          host VARCHAR NOT NULL
-        , url  VARCHAR NOT NULL
-      )
-      """;
-
-  static final String CREATE_INDEX =
-      """
-      CREATE UNIQUE INDEX IF NOT EXISTS
-        host_count_index
-      ON
-        host_count (host, url)
-      """;
-
   private static final String PG_UNDEFINED_RELATION_ERR_CODE = "42P01";
   private static final String PG_UNIQUE_VIOLATION_ERR_CODE = "23505";
-  private static final String CREATE_DOMAIN_STATS_TABLE =
+  static final String CREATE_DOMAIN_STATS_TABLE =
       """
     CREATE TABLE IF NOT EXISTS
       domain_stats (
@@ -76,7 +57,7 @@ public class Manager
         , length bigint  NOT NULL
       );
     """;
-  private static final String CREATE_DOMAIN_STATS_INDEX =
+  static final String CREATE_DOMAIN_STATS_INDEX =
       """
     CREATE UNIQUE INDEX IF NOT EXISTS
       domain_stats_idx
@@ -96,7 +77,6 @@ public class Manager
   private Host[] startUrls;
   private PrimitiveIterator.OfInt nextHostIndex;
 
-  // TODO: Add custom first stage which rejects in importer pipeline and remove delay resolver
   private final GenericDelayResolver delayResolver =
       new GenericDelayResolver() {
         @Override
@@ -168,40 +148,14 @@ public class Manager
 
   @Override
   public boolean acceptMetadata(final String ref, final Properties metadata) {
-    // Only if content-type matches expectation, we want to play with host_count
-
     final boolean isContentValid =
         CONTENT_TYPE_FILTERS.stream().anyMatch(f -> f.acceptMetadata(ref, metadata));
 
     if (!isContentValid) {
       LOGGER.info("Unacceptable content for ref {}", ref);
       return false;
-    }
-
-    // ref is already normalized
-    final URI uri = URI.create(ref);
-    final Host host = new Host(uri);
-    final String reference = removeScheme(uri);
-
-    // TODO: insertIntoDb and local count handling should happen in a txn
-
-    if (count.containsKey(host)) {
-      AtomicInteger i = count.get(host);
-
-      if (i.get() >= limit) {
-        LOGGER.info("Filtered by metadata: host {}, ref {}", host, reference);
-        return false;
-      } else {
-        return insertIntoDb(host, reference) && i.incrementAndGet() <= limit;
-      }
-
     } else {
-      if (insertIntoDb(host, reference)) {
-        count.put(host, new AtomicInteger(1));
-        return true;
-      } else {
-        throw new IllegalStateException("Inserting host in DB failed, without being initialized.");
-      }
+      return true;
     }
   }
 
@@ -215,32 +169,7 @@ public class Manager
     // FOUND_CANONICAL to process correctly even when the host count limit is reached. Until then,
     // ignoring canonical links (CrawlerConfig).
 
-    if (event.is(CrawlerEvent.CRAWLER_INIT_BEGIN)) {
-      // create table
-
-      try (var con = this.dataSource.getConnection();
-          var createTablePs = con.prepareStatement(CREATE_TABLE);
-          var indexStmt = con.createStatement()) {
-
-        createTablePs.executeUpdate();
-        indexStmt.executeUpdate(CREATE_INDEX);
-
-      } catch (SQLException e) {
-        throw new RuntimeException(e);
-      }
-    } else if (event.is(CrawlerEvent.CRAWLER_RUN_END) || event.is(CrawlerEvent.CRAWLER_CLEAN_END)) {
-      try (var con = this.dataSource.getConnection();
-          // TODO: IF EXISTS?
-          var createTablePs = con.prepareStatement("DROP TABLE host_count")) {
-
-        createTablePs.executeUpdate();
-
-        count.clear();
-
-      } catch (SQLException e) {
-        throw new RuntimeException(e);
-      }
-    } else if (event instanceof CrawlerEvent ce && ce.is(CrawlerEvent.DOCUMENT_QUEUED)) {
+    if (event instanceof CrawlerEvent ce && ce.is(CrawlerEvent.DOCUMENT_QUEUED)) {
       // host has been queued, remove from not queued hosts if it exists there.
       Host host = new Host(URI.create(ce.getCrawlDocInfo().getReference()));
 
@@ -294,7 +223,7 @@ public class Manager
     SELECT
       host, count(*)
     FROM
-      host_count
+      domain_stats
     GROUP BY host
     """);
   }
@@ -366,25 +295,6 @@ public class Manager
     }
   }
 
-  private boolean insertIntoDb(final Host host, final String reference) {
-    try (var con = this.dataSource.getConnection();
-        var ps = con.prepareStatement("INSERT INTO host_count(host, url) VALUES (?, ?)")) {
-
-      ps.setString(1, host.toString());
-      ps.setString(2, reference);
-
-      ps.executeUpdate();
-      return true;
-    } catch (SQLException e) {
-      if (PG_UNIQUE_VIOLATION_ERR_CODE.equals(e.getSQLState())) {
-        LOGGER.info("Rejecting duplicate: host {} ref {}", host, reference);
-        return false;
-      } else {
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
   public IDelayResolver delayResolver() {
     return this.delayResolver;
   }
@@ -422,6 +332,7 @@ public class Manager
   }
 
   public boolean acceptHost(Host host) {
+
     if (isQueuedOnce(host)) {
       AtomicInteger i = count.get(host);
 
@@ -467,16 +378,62 @@ public class Manager
     this.notQueuedHosts.add(host);
   }
 
-  void insertIntoDomainStats(final URI uri, final long length) throws SQLException {
-    try (var con = this.dataSource.getConnection();
-        var ps =
-            con.prepareStatement("INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
-      ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
+  // TODO: can be a common function with different sql commands
+  boolean insertIntoDomainStats(final URI uri, final long length) throws SQLException {
+    int rows = 0;
+    boolean local = false;
+    final Host host = new Host(uri);
 
-      ps.setString(2, Manager.removeScheme(uri));
-      ps.setLong(3, length);
-      ps.executeUpdate();
+    try (var con = this.dataSource.getConnection()) {
+
+      try (var ps =
+          con.prepareStatement("INSERT INTO domain_stats (host, url, length) VALUES (?, ?, ?)")) {
+        con.setAutoCommit(false);
+
+        ps.setString(1, host.toString());
+        ps.setString(2, Manager.removeScheme(uri));
+        ps.setLong(3, length);
+
+        rows = ps.executeUpdate();
+
+        if (rows == 0) {
+          LOGGER.error("DB insert failed for key {}, zero rows returned.", new Host(uri));
+          con.rollback();
+          return false;
+        }
+
+        local = localInsert(host);
+        if (!local) {
+          con.rollback();
+          return false;
+        }
+
+        con.commit();
+        return true;
+
+      } catch (SQLException e) {
+
+        LOGGER.error(
+            "Failed to insert as DB and local could not be updated, DB: {}, Local: {}",
+            rows > 0,
+            local);
+
+        if (local) {
+          rollbackLocal(host);
+        }
+
+        con.rollback();
+
+        if (PG_UNIQUE_VIOLATION_ERR_CODE.equals(e.getSQLState())) {
+          LOGGER.info("Rejecting duplicate: {}", uri);
+        } else {
+          throw e;
+        }
+      } finally {
+        con.setAutoCommit(true);
+      }
     }
+    return false;
   }
 
   void deleteFromDomainStats(final URI uri) throws SQLException {
@@ -486,6 +443,80 @@ public class Manager
 
       ps.setString(2, Manager.removeScheme(uri));
       ps.executeUpdate();
+    }
+
+    int rows = 0;
+    boolean local = false;
+    final Host host = new Host(uri);
+
+    try (var con = this.dataSource.getConnection()) {
+
+      try (var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
+        con.setAutoCommit(false);
+
+        ps.setString(1, host.toString());
+        ps.setString(2, Manager.removeScheme(uri));
+
+        rows = ps.executeUpdate();
+
+        if (rows == 0) {
+          LOGGER.error("DB delete failed for key {}, zero rows returned.", new Host(uri));
+          con.rollback();
+        }
+
+        local = localDelete(host);
+        if (!local) {
+          con.rollback();
+        }
+
+        con.commit();
+
+      } catch (SQLException e) {
+
+        LOGGER.error(
+            "Failed to delete as DB and local could not be updated, DB: {}, Local: {}",
+            rows > 0,
+            local);
+
+        if (local) {
+          rollbackLocal(host);
+        }
+
+        con.rollback();
+        throw e;
+      } finally {
+        con.setAutoCommit(true);
+      }
+    }
+  }
+
+  private void rollbackLocal(final Host host) {
+    this.count.get(host).decrementAndGet();
+  }
+
+  private boolean localInsert(final Host host) {
+    if (count.containsKey(host)) {
+      AtomicInteger i = count.get(host);
+
+      if (i.get() >= limit) {
+        return false;
+      } else {
+        return i.incrementAndGet() <= limit;
+      }
+
+    } else {
+      LOGGER.error("count must contain host {} but was missing", host);
+      return false;
+    }
+  }
+
+  private boolean localDelete(final Host host) {
+    if (count.containsKey(host)) {
+      count.get(host).decrementAndGet();
+      return true;
+    } else {
+      LOGGER.error("count must contain host {} but was missing", host);
+      return false;
     }
   }
 }

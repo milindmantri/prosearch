@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.norconex.collector.core.crawler.Crawler;
 import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.doc.CrawlDocInfo;
+import com.norconex.commons.lang.event.Event;
 import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
 import java.sql.SQLException;
@@ -28,10 +29,10 @@ class ManagerTest {
 
   private static final String DROP_TABLE =
       """
-    DROP TABLE IF EXISTS host_count;
+    DROP TABLE IF EXISTS domain_stats;
     """;
 
-  private final Crawler mockCrawler = Mockito.mock(Crawler.class);
+  private static final Crawler mockCrawler = Mockito.mock(Crawler.class);
 
   @AfterAll
   static void closeDataSource() {
@@ -41,8 +42,8 @@ class ManagerTest {
   @BeforeEach
   void createTable() throws SQLException {
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement(Manager.CREATE_TABLE);
-        var indexPs = con.prepareStatement(Manager.CREATE_INDEX)) {
+        var ps = con.prepareStatement(Manager.CREATE_DOMAIN_STATS_TABLE);
+        var indexPs = con.prepareStatement(Manager.CREATE_DOMAIN_STATS_INDEX)) {
       ps.executeUpdate();
       indexPs.executeUpdate();
     }
@@ -69,11 +70,21 @@ class ManagerTest {
 
     assertTrue(
         IntStream.range(0, 3)
-            .mapToObj(i -> dc.acceptMetadata("http://host.com/%d".formatted(i), VALID_PROPS))
-            .allMatch(b -> b));
+            .mapToObj("http://host.com/%d"::formatted)
+            .peek(s -> dc.accept(qEvent(s)))
+            .allMatch(
+                s -> {
+                  try {
+                    return dc.insertIntoDomainStats(URI.create(s), 0);
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
 
-    assertFalse(dc.acceptMetadata("http://host.com/4", VALID_PROPS));
+    assertFalse(dc.insertIntoDomainStats(URI.create("http://host.com/4"), 0));
   }
+
+  // TODO: add tests for error handling of insertsIntoDomainStats
 
   @Test
   void restoreCountWhenStarting() throws SQLException {
@@ -83,10 +94,10 @@ class ManagerTest {
             con.prepareStatement(
                 """
             INSERT INTO
-              host_count
+              domain_stats
             VALUES
-                ('host.com', 'http://host.com/1')
-              , ('host.com', 'http://host.com/2')
+                ('host.com', 'http://host.com/1', 0)
+              , ('host.com', 'http://host.com/2', 0)
             """)) {
       ps.executeUpdate();
     }
@@ -97,10 +108,8 @@ class ManagerTest {
     Mockito.when(engine.hasQueuedTable()).thenReturn(false);
 
     dc.restoreCount(engine);
-
-    assertTrue(dc.acceptMetadata("http://host.com/3", VALID_PROPS));
-
-    assertFalse(dc.acceptMetadata("http://host.com/4", VALID_PROPS));
+    assertTrue(dc.insertIntoDomainStats(URI.create("http://host.com/3"), 0));
+    assertFalse(dc.insertIntoDomainStats(URI.create("http://host.com/4"), 0));
   }
 
   @Test
@@ -116,11 +125,11 @@ class ManagerTest {
     // ensure no table exists
     dropTable();
 
-    dc.accept(new CrawlerEvent.Builder(CrawlerEvent.CRAWLER_INIT_BEGIN, mockCrawler).build());
+    dc.createStatsTableIfNotExists();
 
     String count =
         """
-    SELECT COUNT(*) FROM host_count;
+    SELECT COUNT(*) FROM domain_stats;
     """;
 
     try (var con = datasource.getConnection();
@@ -137,10 +146,11 @@ class ManagerTest {
 
     final String link = "https://www.php.net/new-link?hello=work";
 
-    assertTrue(dc.acceptMetadata(link, VALID_PROPS));
+    dc.accept(qEvent(link));
+    dc.insertIntoDomainStats(URI.create(link), 0);
 
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+        var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
 
       var rs = ps.executeQuery();
 
@@ -159,10 +169,11 @@ class ManagerTest {
 
     final String link = "https://www.php.net/new-link#fragment-data";
 
-    assertTrue(dc.acceptMetadata(link, VALID_PROPS));
+    dc.accept(qEvent(link));
+    dc.insertIntoDomainStats(URI.create(link), 0);
 
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+        var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
 
       var rs = ps.executeQuery();
 
@@ -208,11 +219,13 @@ class ManagerTest {
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link2";
 
-    assertTrue(dc.acceptMetadata(link1, VALID_PROPS));
-    assertTrue(dc.acceptMetadata(link2, VALID_PROPS));
+    dc.accept(qEvent(link1));
+
+    assertTrue(dc.insertIntoDomainStats(URI.create(link1), 0));
+    assertTrue(dc.insertIntoDomainStats(URI.create(link2), 0));
 
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+        var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
 
       var rs = ps.executeQuery();
 
@@ -235,11 +248,12 @@ class ManagerTest {
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link#frag-on-same-link";
 
-    assertTrue(dc.acceptMetadata(link1, VALID_PROPS));
-    assertFalse(dc.acceptMetadata(link2, VALID_PROPS));
+    dc.accept(qEvent(link1));
+    assertTrue(dc.insertIntoDomainStats(URI.create(link1), 0));
+    assertFalse(dc.insertIntoDomainStats(URI.create(link2), 0));
 
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+        var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
 
       var rs = ps.executeQuery();
 
@@ -251,12 +265,12 @@ class ManagerTest {
   }
 
   @Test
-  void dropTableWhenCrawlingEnds() throws SQLException {
+  void dropTableWorks() throws SQLException {
     var dc = new Manager(2, datasource);
-    dc.accept(new CrawlerEvent.Builder(CrawlerEvent.CRAWLER_RUN_END, mockCrawler).build());
+    dc.dropStatsTable();
 
     try (var con = datasource.getConnection();
-        var ps = con.prepareStatement("SELECT host, url FROM host_count")) {
+        var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
 
       SQLException ex = assertThrows(SQLException.class, ps::executeQuery);
       assertEquals("42P01", ex.getSQLState());
@@ -271,9 +285,17 @@ class ManagerTest {
     assertTrue(
         IntStream.range(0, 3)
             .mapToObj("http://host.com/%d"::formatted)
-            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+            .peek(s -> dc.accept(qEvent(s)))
+            .allMatch(
+                str -> {
+                  try {
+                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
 
-    assertFalse(dc.acceptReference("http://host.com/4"));
+    assertFalse(dc.insertIntoDomainStats(URI.create("http://host.com/4"), 0));
   }
 
   @Test
@@ -295,7 +317,15 @@ class ManagerTest {
         IntStream.range(0, 2)
             .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
             .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
-            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+            .peek(s -> dc.accept(qEvent(s)))
+            .allMatch(
+                str -> {
+                  try {
+                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
 
     assertEquals(new Host("site1.com"), dc.getNextHost().get());
     assertEquals(new Host("site2.com"), dc.getNextHost().get());
@@ -327,7 +357,15 @@ class ManagerTest {
         IntStream.range(0, 2)
             .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
             .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
-            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+            .peek(s -> dc.accept(qEvent(s)))
+            .allMatch(
+                str -> {
+                  try {
+                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
 
     assertEquals(new Host("site1.com"), dc.getNextHost().get());
     assertEquals(new Host("site2.com"), dc.getNextHost().get());
@@ -348,7 +386,15 @@ class ManagerTest {
         IntStream.range(0, 2)
             .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
             .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
-            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+            .peek(s -> dc.accept(qEvent(s)))
+            .allMatch(
+                str -> {
+                  try {
+                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
 
     assertEquals(new Host("site1.com"), dc.getNextHost().get());
     assertEquals(new Host("site2.com"), dc.getNextHost().get());
@@ -366,5 +412,11 @@ class ManagerTest {
     assertEquals(new Host("site1.com"), dc.getNextHost().get());
     assertEquals(new Host("site2.com"), dc.getNextHost().get());
     assertEquals(new Host("site1.com"), dc.getNextHost().get());
+  }
+
+  static Event qEvent(String link) {
+    return new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, mockCrawler)
+        .crawlDocInfo(new CrawlDocInfo(link))
+        .build();
   }
 }

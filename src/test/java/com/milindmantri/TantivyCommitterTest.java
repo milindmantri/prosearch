@@ -1,5 +1,6 @@
 package com.milindmantri;
 
+import static com.milindmantri.ManagerTest.qEvent;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
@@ -40,11 +41,13 @@ class TantivyCommitterTest {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
+      final String link1 = "http://example.com";
+      manager.accept(qEvent(link1));
       assertDoesNotThrow(
           () ->
               tc.doUpsert(
                   new UpsertRequest(
-                      "http://example.com",
+                      link1,
                       props,
                       new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
 
@@ -277,11 +280,13 @@ class TantivyCommitterTest {
 
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
+      final String link1 = "http://example.com/hello-world";
+      manager.accept(qEvent(link1));
       assertDoesNotThrow(
           () ->
               tc.doUpsert(
                   new UpsertRequest(
-                      "http://example.com/hello-world",
+                      link1,
                       props,
                       new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
 
@@ -314,22 +319,26 @@ class TantivyCommitterTest {
               VALUES ('example.com', 'example.com/hello-world', 7)
               """);
 
-      var props = new Properties(Map.of("title", List.of("Example Title")));
+      try (var es = JdbcStoreTest.EngineStore.queueStore(manager)) {
+        manager.restoreCount(es.engine());
 
-      assertDoesNotThrow(
-          () ->
-              tc.doUpsert(
-                  new UpsertRequest(
-                      "http://example.com/hello-world",
-                      props,
-                      new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
+        var props = new Properties(Map.of("title", List.of("Example Title")));
 
-      var rs = ps.executeQuery();
-      assertTrue(rs.next());
-      assertEquals("example.com", rs.getString(1));
-      assertEquals("example.com/hello-world", rs.getString(2));
-      assertEquals(6, rs.getLong(3));
-      assertFalse(rs.next());
+        assertDoesNotThrow(
+            () ->
+                tc.doUpsert(
+                    new UpsertRequest(
+                        "http://example.com/hello-world",
+                        props,
+                        new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)))));
+
+        var rs = ps.executeQuery();
+        assertTrue(rs.next());
+        assertEquals("example.com", rs.getString(1));
+        assertEquals("example.com/hello-world", rs.getString(2));
+        assertEquals(6, rs.getLong(3));
+        assertFalse(rs.next());
+      }
     }
   }
 
