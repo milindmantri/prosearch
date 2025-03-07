@@ -140,7 +140,7 @@ class JdbcStoreTest {
         .forEach(
             s -> {
               try {
-                dc.insertIntoDomainStats(URI.create(s), 0);
+                dc.saveProcessed(URI.create(s), 0);
               } catch (SQLException e) {
                 throw new RuntimeException(e);
               }
@@ -178,7 +178,7 @@ class JdbcStoreTest {
         .forEach(
             s -> {
               try {
-                dc.insertIntoDomainStats(URI.create(s), 0);
+                dc.saveProcessed(URI.create(s), 0);
               } catch (SQLException e) {
                 throw new RuntimeException(e);
               }
@@ -226,9 +226,9 @@ class JdbcStoreTest {
               .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
 
       assertEquals(s1, store.deleteFirst().get().getReference());
-      dc.insertIntoDomainStats(URI.create(s1), 0);
+      dc.saveProcessed(URI.create(s1), 0);
       assertEquals(s1 + "/1", store.deleteFirst().get().getReference());
-      dc.insertIntoDomainStats(URI.create(s1 + "/1"), 0);
+      dc.saveProcessed(URI.create(s1 + "/1"), 0);
 
       assertTrue(store.deleteFirst().isEmpty());
 

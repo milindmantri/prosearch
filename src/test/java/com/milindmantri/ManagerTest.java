@@ -75,13 +75,13 @@ class ManagerTest {
             .allMatch(
                 s -> {
                   try {
-                    return dc.insertIntoDomainStats(URI.create(s), 0);
+                    return dc.saveProcessed(URI.create(s), 0);
                   } catch (SQLException e) {
                     throw new RuntimeException(e);
                   }
                 }));
 
-    assertFalse(dc.insertIntoDomainStats(URI.create("http://host.com/4"), 0));
+    assertFalse(dc.saveProcessed(URI.create("http://host.com/4"), 0));
   }
 
   // TODO: add tests for error handling of insertsIntoDomainStats
@@ -108,8 +108,8 @@ class ManagerTest {
     Mockito.when(engine.hasQueuedTable()).thenReturn(false);
 
     dc.restoreCount(engine);
-    assertTrue(dc.insertIntoDomainStats(URI.create("http://host.com/3"), 0));
-    assertFalse(dc.insertIntoDomainStats(URI.create("http://host.com/4"), 0));
+    assertTrue(dc.saveProcessed(URI.create("http://host.com/3"), 0));
+    assertFalse(dc.saveProcessed(URI.create("http://host.com/4"), 0));
   }
 
   @Test
@@ -147,7 +147,7 @@ class ManagerTest {
     final String link = "https://www.php.net/new-link?hello=work";
 
     dc.accept(qEvent(link));
-    dc.insertIntoDomainStats(URI.create(link), 0);
+    dc.saveProcessed(URI.create(link), 0);
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
@@ -170,7 +170,7 @@ class ManagerTest {
     final String link = "https://www.php.net/new-link#fragment-data";
 
     dc.accept(qEvent(link));
-    dc.insertIntoDomainStats(URI.create(link), 0);
+    dc.saveProcessed(URI.create(link), 0);
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
@@ -221,8 +221,8 @@ class ManagerTest {
 
     dc.accept(qEvent(link1));
 
-    assertTrue(dc.insertIntoDomainStats(URI.create(link1), 0));
-    assertTrue(dc.insertIntoDomainStats(URI.create(link2), 0));
+    assertTrue(dc.saveProcessed(URI.create(link1), 0));
+    assertTrue(dc.saveProcessed(URI.create(link2), 0));
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
@@ -249,8 +249,8 @@ class ManagerTest {
     final String link2 = "https://www.php.net/new-link#frag-on-same-link";
 
     dc.accept(qEvent(link1));
-    assertTrue(dc.insertIntoDomainStats(URI.create(link1), 0));
-    assertFalse(dc.insertIntoDomainStats(URI.create(link2), 0));
+    assertTrue(dc.saveProcessed(URI.create(link1), 0));
+    assertFalse(dc.saveProcessed(URI.create(link2), 0));
 
     try (var con = datasource.getConnection();
         var ps = con.prepareStatement("SELECT host, url FROM domain_stats")) {
@@ -289,13 +289,13 @@ class ManagerTest {
             .allMatch(
                 str -> {
                   try {
-                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                    return dc.saveProcessed(URI.create(str), 0);
                   } catch (SQLException e) {
                     throw new RuntimeException(e);
                   }
                 }));
 
-    assertFalse(dc.insertIntoDomainStats(URI.create("http://host.com/4"), 0));
+    assertFalse(dc.saveProcessed(URI.create("http://host.com/4"), 0));
   }
 
   @Test
@@ -321,7 +321,7 @@ class ManagerTest {
             .allMatch(
                 str -> {
                   try {
-                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                    return dc.saveProcessed(URI.create(str), 0);
                   } catch (SQLException e) {
                     throw new RuntimeException(e);
                   }
@@ -361,7 +361,7 @@ class ManagerTest {
             .allMatch(
                 str -> {
                   try {
-                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                    return dc.saveProcessed(URI.create(str), 0);
                   } catch (SQLException e) {
                     throw new RuntimeException(e);
                   }
@@ -390,7 +390,7 @@ class ManagerTest {
             .allMatch(
                 str -> {
                   try {
-                    return dc.insertIntoDomainStats(URI.create(str), 0);
+                    return dc.saveProcessed(URI.create(str), 0);
                   } catch (SQLException e) {
                     throw new RuntimeException(e);
                   }

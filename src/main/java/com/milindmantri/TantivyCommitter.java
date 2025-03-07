@@ -95,8 +95,8 @@ public class TantivyCommitter extends AbstractCommitter {
       }
 
       if (deleteResult && maybeIndexedBytesLength.isPresent()) {
-        this.manager.deleteFromDomainStats(uri);
-        this.manager.insertIntoDomainStats(uri, maybeIndexedBytesLength.get());
+        this.manager.deleteProcessed(uri);
+        this.manager.saveProcessed(uri, maybeIndexedBytesLength.get());
       } else {
         throw new CommitterException(
             String.format(
@@ -121,7 +121,7 @@ public class TantivyCommitter extends AbstractCommitter {
         throw new CommitterException(
             "Could not process delete request for %s".formatted(deleteRequest));
       } else {
-        this.manager.deleteFromDomainStats(uri);
+        this.manager.deleteProcessed(uri);
       }
     } catch (IOException | InterruptedException | SQLException e) {
       throw new RuntimeException(e);

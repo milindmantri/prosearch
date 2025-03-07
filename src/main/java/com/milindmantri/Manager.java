@@ -379,7 +379,8 @@ public class Manager
   }
 
   // TODO: can be a common function with different sql commands
-  boolean insertIntoDomainStats(final URI uri, final long length) throws SQLException {
+  /** Save entry. Should be called after all processing has been done. */
+  boolean saveProcessed(final URI uri, final long length) throws SQLException {
     int rows = 0;
     boolean local = false;
     final Host host = new Host(uri);
@@ -436,7 +437,7 @@ public class Manager
     return false;
   }
 
-  void deleteFromDomainStats(final URI uri) throws SQLException {
+  void deleteProcessed(final URI uri) throws SQLException {
     try (var con = this.dataSource.getConnection();
         var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
       ps.setString(1, Objects.requireNonNull(uri.getAuthority()));
