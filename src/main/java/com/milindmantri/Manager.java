@@ -504,7 +504,7 @@ public class Manager
       }
 
     } else {
-      LOGGER.error("count must contain host {} but was missing", host);
+      LOGGER.error("count must contain host {} but was missing for local insert", host);
       return false;
     }
   }
@@ -514,7 +514,7 @@ public class Manager
       count.get(host).decrementAndGet();
       return true;
     } else {
-      LOGGER.error("count must contain host {} but was missing", host);
+      LOGGER.error("count must contain host {} but was missing for local delete", host);
       return false;
     }
   }
