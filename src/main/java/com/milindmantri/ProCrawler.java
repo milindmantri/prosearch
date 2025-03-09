@@ -15,6 +15,8 @@ public class ProCrawler extends HttpCrawler {
 
   private final Manager manager;
   private final HttpCrawlerConfig config;
+  private boolean isResuming;
+  private boolean isRecrawl;
 
   private static class ImporterQueueRejectPipeline extends HttpImporterPipeline {
 
@@ -58,6 +60,13 @@ public class ProCrawler extends HttpCrawler {
     // init is guaranteed to be called by the lib
 
     this.manager.setCrawler(this);
+    this.isResuming = resume;
+
+    // get from cached store
+    var isCacheEmpty = ((JdbcStoreEngine) this.getDataStoreEngine()).isCacheEmpty();
+    if (!isCacheEmpty) {
+      this.isRecrawl = true;
+    }
 
     super.beforeCrawlerExecution(resume);
 
@@ -77,5 +86,13 @@ public class ProCrawler extends HttpCrawler {
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public boolean isRecrawling() {
+    return this.isRecrawl;
+  }
+
+  public boolean isResuming() {
+    return this.isResuming;
   }
 }

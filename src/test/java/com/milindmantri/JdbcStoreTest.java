@@ -1,13 +1,17 @@
 package com.milindmantri;
 
+import static com.milindmantri.ManagerTest.genDoc;
 import static com.milindmantri.ManagerTest.qEvent;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.norconex.collector.core.Collector;
 import com.norconex.collector.core.crawler.Crawler;
 import com.norconex.collector.core.doc.CrawlDocInfo;
+import com.norconex.collector.core.store.DataStoreException;
 import com.norconex.commons.lang.map.Properties;
 import com.zaxxer.hikari.HikariDataSource;
 import java.io.Closeable;
@@ -28,6 +32,9 @@ class JdbcStoreTest {
   static final String QUEUE_TABLE =
       "%s_%s_%s".formatted(COLLECTOR, CRAWLER, JdbcStore.QUEUED_STORE);
 
+  static final String CACHE_TABLE =
+      "%s_%s_%s".formatted(COLLECTOR, CRAWLER, JdbcStore.CACHED_STORE);
+
   @AfterAll
   static void close() {
     ds.close();
@@ -38,9 +45,9 @@ class JdbcStoreTest {
     TestCommons.exec(
         ds,
         """
-  DROP TABLE %s, domain_stats;
+  DROP TABLE IF EXISTS %s, %s, domain_stats;
   """
-            .formatted(QUEUE_TABLE));
+            .formatted(QUEUE_TABLE, CACHE_TABLE));
   }
 
   @BeforeEach
@@ -250,6 +257,32 @@ class JdbcStoreTest {
     }
   }
 
+  @Test
+  void cachedEmpty() throws SQLException {
+    Manager dc = new Manager(2, ds, Stream.of("http://example.com").map(URI::create));
+    try (var es = EngineStore.cacheStore(dc)) {
+      assertTrue(es.engine().isCacheEmpty());
+    }
+  }
+
+  @Test
+  void cachedNotEmpty() throws SQLException {
+    Manager dc = new Manager(2, ds, Stream.of("http://example.com").map(URI::create));
+    try (var es = EngineStore.cacheStore(dc)) {
+      es.store().save("http://example.com/1", genDoc("http://example.com/1"));
+      assertFalse(es.engine().isCacheEmpty());
+    }
+  }
+
+  @Test
+  void cachedDrop() throws SQLException {
+    Manager dc = new Manager(2, ds, Stream.of("http://example.com").map(URI::create));
+    try (var es = EngineStore.cacheStore(dc)) {
+      TestCommons.exec(ds, "DROP TABLE %s".formatted(CACHE_TABLE));
+      assertThrows(DataStoreException.class, () -> es.engine().isCacheEmpty());
+    }
+  }
+
   record EngineStore(JdbcStoreEngine engine, JdbcStore<CrawlDocInfo> store) implements Closeable {
 
     @Override
@@ -258,7 +291,15 @@ class JdbcStoreTest {
       this.store.close();
     }
 
+    static EngineStore cacheStore(final Manager m) {
+      return someStore(JdbcStore.CACHED_STORE, m);
+    }
+
     static EngineStore queueStore(final Manager m) {
+      return someStore(JdbcStore.QUEUED_STORE, m);
+    }
+
+    private static EngineStore someStore(final String name, final Manager m) {
 
       Crawler crawler = Mockito.mock(Crawler.class);
       Collector collector = Mockito.mock(Collector.class);
@@ -271,7 +312,7 @@ class JdbcStoreTest {
       e.setConfigProperties(new Properties(TestCommons.dbProps()));
       e.init(crawler);
 
-      var store = new JdbcStore<>(e, JdbcStore.QUEUED_STORE, CrawlDocInfo.class, m);
+      var store = new JdbcStore<>(e, name, CrawlDocInfo.class, m);
 
       return new EngineStore(e, store);
     }

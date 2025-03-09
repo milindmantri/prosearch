@@ -40,6 +40,7 @@ public class JdbcStore<T> implements IDataStore<T> {
 
   private static final JdbcStore.PreparedStatementConsumer NO_ARGS = stmt -> {};
   static final String QUEUED_STORE = "queued";
+  static final String CACHED_STORE = "cached";
 
   private final JdbcStoreEngine engine;
   private String tableName;

@@ -355,4 +355,24 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
   private String queuedTableName() {
     return this.tableName(JdbcStore.QUEUED_STORE);
   }
+
+  public boolean isCacheEmpty() {
+    if (this.tableExist(cachedTableName())) {
+
+      try (var con = this.datasource.getConnection();
+          var ps = con.prepareStatement("SELECT * FROM %s LIMIT 1".formatted(cachedTableName()))) {
+        var rs = ps.executeQuery();
+
+        return !rs.next();
+      } catch (SQLException e) {
+        throw new DataStoreException("Could not check if cache is empty.", e);
+      }
+    } else {
+      throw new DataStoreException("cache table does not exist.");
+    }
+  }
+
+  private String cachedTableName() {
+    return this.tableName(JdbcStore.CACHED_STORE);
+  }
 }
