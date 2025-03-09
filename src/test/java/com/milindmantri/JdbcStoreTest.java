@@ -196,10 +196,13 @@ class JdbcStoreTest {
               .formatted(QUEUE_TABLE, s1, new Host(URI.create(s1))));
 
       assertEquals(s1 + "/1", es.store().deleteFirst().get().getReference());
-      assertEquals(s1 + "/2", es.store().deleteFirst().get().getReference());
 
-      assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
-      assertEquals(new Host(URI.create(s1)), dc.getNextHost().get());
+      assertEquals(new Host(URI.create(s2)), dc.getNextHost().get());
+
+      assertEquals(s1 + "/2", es.store().deleteFirst().get().getReference());
+      assertEquals(new Host(URI.create(s2)), dc.getNextHost().get());
+
+      assertTrue(es.store().deleteFirst().isEmpty());
     }
   }
 

@@ -19,6 +19,8 @@ import java.sql.Timestamp;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 
 /**
@@ -44,13 +46,13 @@ public class JdbcStore<T> implements IDataStore<T> {
   private String storeName;
   private final Class<? extends T> type;
   private final ProsearchTableAdapter adapter;
+
   private final Manager manager;
+  // relevant for queue store
+  private final Set<Host> missedDeletes = ConcurrentHashMap.newKeySet();
 
   JdbcStore(
-      JdbcStoreEngine engine,
-      String storeName,
-      Class<? extends T> type,
-      final Manager manager) {
+      JdbcStoreEngine engine, String storeName, Class<? extends T> type, final Manager manager) {
     super();
     this.engine = requireNonNull(engine, "'engine' must not be null.");
     this.type = requireNonNull(type, "'type' must not be null.");
@@ -110,7 +112,10 @@ public class JdbcStore<T> implements IDataStore<T> {
           stmt.setString(3, GSON.toJson(object));
 
           if (isQueued()) {
-            stmt.setString(4, new Host(URI.create(idValue)).toString());
+            var host = new Host(URI.create(idValue));
+            stmt.setString(4, host.toString());
+
+            this.missedDeletes.remove(host);
           }
         });
   }
@@ -182,7 +187,7 @@ public class JdbcStore<T> implements IDataStore<T> {
             delete(rec.id);
             return rec.object;
           } else {
-            manager.notQueued(next.get());
+            this.missedDeletes.add(next.get());
           }
 
         } catch (SQLException e) {

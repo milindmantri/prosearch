@@ -69,7 +69,8 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setStartURLs(this.startUrls.stream().map(URI::toString).toList());
 
-    crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
+    //    crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
+    crawlerConfig.setNumThreads(1);
 
     crawlerConfig.setId(System.getProperty("crawler-id", "crwlr"));
 
@@ -96,10 +97,10 @@ public final class CrawlerRunner implements Runnable {
 
         crawlerConfig.setLinkExtractors(htmlLinkExtractor);
 
-        crawlerConfig.setReferenceFilters(manager);
+        //        crawlerConfig.setReferenceFilters(manager);
         crawlerConfig.setEventListeners(manager);
         crawlerConfig.setMetadataFilters(manager);
-        crawlerConfig.setHttpFetchers(manager.httpFetcher());
+        //        crawlerConfig.setHttpFetchers(manager.httpFetcher());
         crawlerConfig.setDelayResolver(manager.delayResolver());
 
         crawlerConfig.setCommitters(new TantivyCommitter(this.client, manager));
