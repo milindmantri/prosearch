@@ -1,5 +1,7 @@
 package com.milindmantri;
 
+import static com.norconex.collector.core.doc.CrawlDocMetadata.IS_CRAWL_NEW;
+
 import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.doc.CrawlState;
 import com.norconex.collector.core.filter.IMetadataFilter;
@@ -26,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
+import org.apache.poi.ss.formula.functions.T;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,6 +166,14 @@ public class Manager
 
   @Override
   public boolean execute(final ImporterPipelineContext context) {
+    // crawler lib never writes to cache store unless it is recrawling, where it renames processed
+    // to cached and starts going over start urls and cached.
+
+    // recrawling, as it is only set when doc is found in cache
+    if (!context.getDocument().getMetadata().getBoolean(IS_CRAWL_NEW)) {
+      return true;
+    }
+
     // results in NPE if not set (incorrect expectation in lib)
     context.getDocInfo().setState(CrawlState.REJECTED);
 

@@ -1,10 +1,13 @@
 package com.milindmantri;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 
 import com.norconex.collector.core.crawler.Crawler;
 import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.doc.CrawlDocInfo;
+import com.norconex.collector.core.doc.CrawlDocMetadata;
+import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
 import com.norconex.commons.lang.event.Event;
 import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
@@ -849,6 +852,19 @@ class ManagerTest {
 
     dc.setCrawler(crawler);
     assertTrue(dc.acceptReference(site));
+  }
+
+  @Test
+  void importerStage() {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource);
+
+    var crawler = Mockito.mock(ProCrawler.class);
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(false);
+
+    assertTrue(dc.execute(context));
   }
 
   static Event qEvent(String link) {
