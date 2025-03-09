@@ -345,7 +345,7 @@ public class Manager
 
       return i.get() < limit;
     } else {
-      return true;
+      return false;
     }
   }
 
@@ -368,7 +368,7 @@ public class Manager
         }
 
         host = this.startUrls[i];
-      } while (!(isQueuedOnce(host) && acceptHost(host)) && this.nextHostIndex.hasNext());
+      } while (!acceptHost(host) && this.nextHostIndex.hasNext());
 
       return Optional.of(host);
     }

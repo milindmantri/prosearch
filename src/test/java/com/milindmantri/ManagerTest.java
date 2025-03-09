@@ -1,6 +1,5 @@
 package com.milindmantri;
 
-import static com.milindmantri.TestCommons.VALID_PROPS;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.norconex.collector.core.crawler.Crawler;
@@ -340,15 +339,22 @@ class ManagerTest {
 
   @Test
   void getNextHostLimitReached() throws SQLException {
-    Manager dc =
-        new Manager(
-            3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
+    String s1 = "http://site1.com", s2 = "https://site2.com";
+    Manager dc = new Manager(3, datasource, Stream.of(s1, s2).map(URI::create));
 
     assertTrue(
         IntStream.range(0, 3)
-            .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
-            .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
-            .allMatch(str -> dc.acceptReference(str) && dc.acceptMetadata(str, VALID_PROPS)));
+            .<Function<String, String>>mapToObj(i -> (s -> s + "/" + i))
+            .flatMap(s -> Stream.of(s.apply(s2), s.apply(s1)))
+            .peek(s -> dc.accept(qEvent(s)))
+            .allMatch(
+                str -> {
+                  try {
+                    return dc.saveProcessed(URI.create(str), 0);
+                  } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                  }
+                }));
 
     assertTrue(dc.getNextHost().isEmpty());
   }
