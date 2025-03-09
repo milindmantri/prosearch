@@ -45,7 +45,6 @@ public class Manager
 
   private static final List<IMetadataFilter> CONTENT_TYPE_FILTERS = getTextOnlyMetadataFilters();
 
-  private static final String PG_UNDEFINED_RELATION_ERR_CODE = "42P01";
   private static final String PG_UNIQUE_VIOLATION_ERR_CODE = "23505";
   static final String CREATE_DOMAIN_STATS_TABLE =
       """
@@ -72,7 +71,6 @@ public class Manager
 
   private final DataSource dataSource;
   // TODO: make final
-  private final Set<Host> notQueuedHosts = ConcurrentHashMap.newKeySet();
   private Host[] startUrls;
   private PrimitiveIterator.OfInt nextHostIndex;
 
@@ -181,7 +179,6 @@ public class Manager
       if (!isQueuedOnce(host)) {
         count.put(host, new AtomicInteger(0));
       }
-      this.notQueuedHosts.remove(host);
     }
   }
 
