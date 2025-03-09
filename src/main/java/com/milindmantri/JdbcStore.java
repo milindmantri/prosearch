@@ -168,7 +168,7 @@ public class JdbcStore<T> implements IDataStore<T> {
 
     if (isQueued()) {
       final Optional<Host> next = this.manager.getNextHost();
-      if (next.isPresent()) {
+      if (next.isPresent() && !this.missedDeletes.contains(next.get())) {
 
         final String sql = "SELECT id, json FROM <table> WHERE host = ? ORDER BY modified LIMIT 1";
 

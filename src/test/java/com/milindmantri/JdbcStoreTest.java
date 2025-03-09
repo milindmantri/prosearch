@@ -25,7 +25,7 @@ class JdbcStoreTest {
   private static final HikariDataSource ds = TestCommons.createTestDataSource();
   private static final String CRAWLER = "cra";
   private static final String COLLECTOR = "col";
-  private static final String QUEUE_TABLE =
+  static final String QUEUE_TABLE =
       "%s_%s_%s".formatted(COLLECTOR, CRAWLER, JdbcStore.QUEUED_STORE);
 
   @AfterAll

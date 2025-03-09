@@ -368,21 +368,11 @@ public class Manager
         }
 
         host = this.startUrls[i];
-      } while (!(isQueuedOnce(host) && acceptHost(host) && maybeQueued(host))
-          && this.nextHostIndex.hasNext());
+      } while (!(isQueuedOnce(host) && acceptHost(host)) && this.nextHostIndex.hasNext());
 
       return Optional.of(host);
     }
     return Optional.empty();
-  }
-
-  private boolean maybeQueued(final Host host) {
-    return !this.notQueuedHosts.contains(host);
-  }
-
-  /** Call when host is not found when looking in queue */
-  public void notQueued(final Host host) {
-    this.notQueuedHosts.add(host);
   }
 
   // TODO: can be a common function with different sql commands

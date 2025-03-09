@@ -13,6 +13,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -30,8 +31,9 @@ class ManagerTest {
 
   private static final String DROP_TABLE =
       """
-    DROP TABLE IF EXISTS domain_stats;
-    """;
+    DROP TABLE IF EXISTS domain_stats, %s;
+    """
+          .formatted(JdbcStoreTest.QUEUE_TABLE);
 
   private static final Crawler mockCrawler = Mockito.mock(Crawler.class);
 
@@ -105,7 +107,7 @@ class ManagerTest {
 
     Manager dc = new Manager(3, datasource);
 
-    try(var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
+    try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
       var crawler = Mockito.mock(ProCrawler.class);
       Mockito.when(crawler.getDataStoreEngine()).thenReturn(es.engine());
       dc.setCrawler(crawler);
@@ -351,71 +353,113 @@ class ManagerTest {
     assertTrue(dc.getNextHost().isEmpty());
   }
 
+  record SiteLink(String site, int link) {}
+
+  void queue(Manager m, JdbcStore<CrawlDocInfo> store, Stream<SiteLink> sl) {
+
+    sl.map(s -> s.site() + s.link())
+        .peek(s -> m.accept(qEvent(s)))
+        .forEach(s -> store.save(s, genDoc(s)));
+  }
+
+  void queueWithoutSave(JdbcStore<CrawlDocInfo> store, Stream<SiteLink> sl) throws SQLException {
+
+    try (var con = datasource.getConnection();
+        var ps =
+            con.prepareStatement(
+                """
+    INSERT INTO %s(id, host, json) VALUES (?, ?, ?)
+    """
+                    .formatted(store.tableName()))) {
+      sl.map(s -> s.site() + s.link())
+          .forEach(
+              s -> {
+                try {
+                  ps.setString(1, s);
+                  ps.setString(2, new Host(URI.create(s)).toString());
+                  ps.setString(3, "{\"reference\": \"%s\" }".formatted(s));
+                  ps.executeUpdate();
+                  ps.clearParameters();
+                } catch (SQLException e) {
+                  throw new RuntimeException(e);
+                }
+              });
+    }
+  }
+
+  Optional<URI> pollQueue(JdbcStore<CrawlDocInfo> store) {
+    return store.deleteFirst().map(CrawlDocInfo::getReference).map(URI::create);
+  }
+
   @Test
   void getNextHostMissedOnce() throws SQLException {
-    Manager dc =
-        new Manager(
-            3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
+    final String s1 = "http://site1.com/";
+    final String s2 = "http://site2.com/";
+    Manager dc = new Manager(3, datasource, Stream.of(s1, s2).map(URI::create));
 
-    assertTrue(
-        IntStream.range(0, 2)
-            .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
-            .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
-            .peek(s -> dc.accept(qEvent(s)))
-            .allMatch(
-                str -> {
-                  try {
-                    return dc.saveProcessed(URI.create(str), 0);
-                  } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                  }
-                }));
+    try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
 
-    assertEquals(new Host("site1.com"), dc.getNextHost().get());
-    assertEquals(new Host("site2.com"), dc.getNextHost().get());
+      var store = es.store();
+      queue(
+          dc,
+          store,
+          Stream.of(
+              new SiteLink(s1, 1),
+              new SiteLink(s2, 1),
+              new SiteLink(s2, 2),
+              new SiteLink(s2, 3),
+              new SiteLink(s2, 4),
+              new SiteLink(s2, 5)));
 
-    dc.notQueued(new Host("site1.com"));
-
-    assertEquals(new Host("site2.com"), dc.getNextHost().get());
-    assertEquals(new Host("site2.com"), dc.getNextHost().get());
+      // next s1
+      assertEquals(new Host("site1.com"), new Host(pollQueue(store).get()));
+      // next s2
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+      // next s1 -> missed
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+      // next s2
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+      // added s1
+      queueWithoutSave(store, Stream.of(new SiteLink(s1, 2)));
+      // next s1
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+    }
   }
 
   @Test
   void getNextHostQueued() throws SQLException {
-    Manager dc =
-        new Manager(
-            3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
+    final String s1 = "http://site1.com/", s2 = "https://site2.com/";
+    Manager dc = new Manager(3, datasource, Stream.of(s1, s2).map(URI::create));
 
-    assertTrue(
-        IntStream.range(0, 2)
-            .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
-            .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
-            .peek(s -> dc.accept(qEvent(s)))
-            .allMatch(
-                str -> {
-                  try {
-                    return dc.saveProcessed(URI.create(str), 0);
-                  } catch (SQLException e) {
-                    throw new RuntimeException(e);
-                  }
-                }));
+    try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
 
-    assertEquals(new Host("site1.com"), dc.getNextHost().get());
-    assertEquals(new Host("site2.com"), dc.getNextHost().get());
+      var store = es.store();
+      queue(
+          dc,
+          store,
+          Stream.of(
+              new SiteLink(s1, 1),
+              new SiteLink(s2, 1),
+              new SiteLink(s2, 2),
+              new SiteLink(s2, 3),
+              new SiteLink(s2, 4),
+              new SiteLink(s2, 5)));
 
-    dc.notQueued(new Host("site1.com"));
-
-    assertEquals(new Host("site2.com"), dc.getNextHost().get());
-    assertEquals(new Host("site2.com"), dc.getNextHost().get());
-
-    dc.accept(
-        new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, Mockito.mock(Crawler.class))
-            .crawlDocInfo(new CrawlDocInfo("http://site1.com/123"))
-            .build());
-
-    assertEquals(new Host("site1.com"), dc.getNextHost().get());
-    assertEquals(new Host("site2.com"), dc.getNextHost().get());
-    assertEquals(new Host("site1.com"), dc.getNextHost().get());
+      // next s1
+      assertEquals(new Host("site1.com"), new Host(pollQueue(store).get()));
+      // next s2
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+      // next s1 -> missed
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+      // next s2
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+      // added s1
+      queue(dc, store, Stream.of(new SiteLink(s1, 2)));
+      // next s1
+      assertEquals(new Host("site1.com"), new Host(pollQueue(store).get()));
+      // next s2
+      assertEquals(new Host("site2.com"), new Host(pollQueue(store).get()));
+    }
   }
 
   @Test
@@ -780,5 +824,9 @@ class ManagerTest {
     return new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, mockCrawler)
         .crawlDocInfo(new CrawlDocInfo(link))
         .build();
+  }
+
+  static CrawlDocInfo genDoc(String link) {
+    return new CrawlDocInfo(link);
   }
 }
