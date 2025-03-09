@@ -859,10 +859,38 @@ class ManagerTest {
     var site = "http://site.com";
     var dc = new Manager(3, datasource);
 
-    var crawler = Mockito.mock(ProCrawler.class);
     var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
     Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
         .thenReturn(false);
+
+    assertTrue(dc.execute(context));
+  }
+
+  @Test
+  void importerStageCountNotInit() {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource);
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn(site);
+
+    // since queue not init
+    assertFalse(dc.execute(context));
+  }
+
+  @Test
+  void importerStageCountInit() {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource);
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn(site);
+
+    dc.accept(qEvent(site));
 
     assertTrue(dc.execute(context));
   }

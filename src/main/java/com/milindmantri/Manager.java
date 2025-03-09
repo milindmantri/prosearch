@@ -174,10 +174,16 @@ public class Manager
       return true;
     }
 
-    // results in NPE if not set (incorrect expectation in lib)
-    context.getDocInfo().setState(CrawlState.REJECTED);
+    boolean isAccepted = acceptHost(new Host(URI.create(context.getDocument().getReference())));
 
-    return acceptHost(new Host(URI.create(context.getDocument().getReference())));
+    if (isAccepted) {
+      return true;
+    } else {
+      // results in NPE if not set (incorrect expectation in lib)
+      context.getDocInfo().setState(CrawlState.REJECTED);
+
+      return false;
+    }
   }
 
   public void restoreCount() throws SQLException {
