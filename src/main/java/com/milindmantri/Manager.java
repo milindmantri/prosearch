@@ -475,7 +475,7 @@ public class Manager
     }
   }
 
-  public int count(final Host host) {
+  int count(final Host host) {
     if (count.containsKey(host)) {
       return count.get(host).get();
     } else {
