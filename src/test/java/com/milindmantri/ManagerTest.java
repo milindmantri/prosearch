@@ -826,6 +826,31 @@ class ManagerTest {
     assertFalse(dc.deleteProcessed(URI.create(url)));
   }
 
+  @Test
+  void acceptRefNotQueued() {
+    var dc = new Manager(3, datasource);
+    assertFalse(dc.acceptReference("http://site.com"));
+  }
+
+  @Test
+  void acceptRefQueued() {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource);
+    dc.accept(qEvent(site));
+    assertTrue(dc.acceptReference(site));
+  }
+
+  @Test
+  void acceptRefRecrawl() {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource);
+    var crawler = Mockito.mock(ProCrawler.class);
+    Mockito.when(crawler.isRecrawling()).thenReturn(true);
+
+    dc.setCrawler(crawler);
+    assertTrue(dc.acceptReference(site));
+  }
+
   static Event qEvent(String link) {
     return new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, mockCrawler)
         .crawlDocInfo(new CrawlDocInfo(link))

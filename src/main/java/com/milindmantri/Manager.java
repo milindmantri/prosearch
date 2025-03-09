@@ -9,16 +9,11 @@ import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
 import com.norconex.collector.http.delay.IDelayResolver;
 import com.norconex.collector.http.delay.impl.AbstractDelayResolver;
 import com.norconex.collector.http.delay.impl.GenericDelayResolver;
-import com.norconex.collector.http.fetch.HttpMethod;
-import com.norconex.collector.http.fetch.IHttpFetcher;
-import com.norconex.collector.http.fetch.impl.GenericHttpFetcher;
-import com.norconex.collector.http.robot.RobotsTxt;
 import com.norconex.commons.lang.event.Event;
 import com.norconex.commons.lang.event.IEventListener;
 import com.norconex.commons.lang.map.Properties;
 import com.norconex.commons.lang.pipeline.IPipelineStage;
 import com.norconex.commons.lang.text.TextMatcher;
-import com.norconex.importer.doc.Doc;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -26,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.PrimitiveIterator;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -79,41 +73,8 @@ public class Manager
   private final GenericDelayResolver delayResolver =
       new GenericDelayResolver() {
         @Override
-        public void delay(final RobotsTxt robotsTxt, final String url) {
-          if (acceptReference(url)) {
-            super.delay(robotsTxt, url);
-          }
-        }
-
-        @Override
         protected long resolveExplicitDelay(final String url) {
-          if (acceptReference(url)) {
-            return Integer.parseInt(System.getProperty("crawl-download-delay-seconds", "1"))
-                * 1000L;
-          } else {
-            return 0;
-          }
-        }
-      };
-
-  private final GenericHttpFetcher modifiedHttpFetcher =
-      new GenericHttpFetcher() {
-        @Override
-        public boolean accept(final Doc doc, final HttpMethod httpMethod) {
-          // Done because already queued docs don't go through ref filter again
-          // And if we have already hit the limit, why fetch queued docs
-          if (httpMethod == HttpMethod.HEAD && doc.getReference() != null) {
-            if (acceptReference(doc.getReference())) {
-              return super.accept(doc, httpMethod);
-            } else {
-              LOGGER.info(
-                  "Rejecting from HTTP fetcher since limit reached for ref {}", doc.getReference());
-              return false;
-            }
-          } else {
-
-            return super.accept(doc, httpMethod);
-          }
+          return Integer.parseInt(System.getProperty("crawl-download-delay-seconds", "1")) * 1000L;
         }
       };
 
@@ -193,11 +154,11 @@ public class Manager
 
     // ref is already normalized
     final Host host = new Host(URI.create(normalized));
-    return acceptHost(host);
+    return this.isRecrawling() || acceptHost(host);
   }
 
-  public IHttpFetcher httpFetcher() {
-    return this.modifiedHttpFetcher;
+  private boolean isRecrawling() {
+    return this.crawler != null && this.crawler.isRecrawling();
   }
 
   @Override

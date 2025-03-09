@@ -97,10 +97,9 @@ public final class CrawlerRunner implements Runnable {
 
         crawlerConfig.setLinkExtractors(htmlLinkExtractor);
 
-        //        crawlerConfig.setReferenceFilters(manager);
+        crawlerConfig.setReferenceFilters(manager);
         crawlerConfig.setEventListeners(manager);
         crawlerConfig.setMetadataFilters(manager);
-        //        crawlerConfig.setHttpFetchers(manager.httpFetcher());
         crawlerConfig.setDelayResolver(manager.delayResolver());
 
         crawlerConfig.setCommitters(new TantivyCommitter(this.client, manager));
