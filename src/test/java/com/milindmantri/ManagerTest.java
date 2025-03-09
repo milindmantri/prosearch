@@ -105,12 +105,15 @@ class ManagerTest {
 
     Manager dc = new Manager(3, datasource);
 
-    var engine = Mockito.mock(JdbcStoreEngine.class);
-    Mockito.when(engine.hasQueuedTable()).thenReturn(false);
+    try(var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
+      var crawler = Mockito.mock(ProCrawler.class);
+      Mockito.when(crawler.getDataStoreEngine()).thenReturn(es.engine());
+      dc.setCrawler(crawler);
 
-    dc.restoreCount(engine);
-    assertTrue(dc.saveProcessed(URI.create("http://host.com/3"), 0));
-    assertFalse(dc.saveProcessed(URI.create("http://host.com/4"), 0));
+      dc.restoreCount();
+      assertTrue(dc.saveProcessed(URI.create("http://host.com/3"), 0));
+      assertFalse(dc.saveProcessed(URI.create("http://host.com/4"), 0));
+    }
   }
 
   @Test

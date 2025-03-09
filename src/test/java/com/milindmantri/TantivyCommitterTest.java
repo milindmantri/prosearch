@@ -320,7 +320,11 @@ class TantivyCommitterTest {
               """);
 
       try (var es = JdbcStoreTest.EngineStore.queueStore(manager)) {
-        manager.restoreCount(es.engine());
+        var crawler = Mockito.mock(ProCrawler.class);
+        Mockito.when(crawler.getDataStoreEngine()).thenReturn(es.engine());
+        manager.setCrawler(crawler);
+
+        manager.restoreCount();
 
         var props = new Properties(Map.of("title", List.of("Example Title")));
 

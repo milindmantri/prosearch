@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -339,11 +340,19 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
     }
   }
 
-  public boolean hasQueuedTable() {
-    return this.tableExist(queuedTableName());
+  public Stream<HostCount> queuedEntries() throws SQLException {
+    return Manager.queryDb(
+        this.datasource,
+        """
+        SELECT DISTINCT host, 0 as c
+        FROM %s
+        GROUP BY host
+        """
+            .formatted(this.queuedTableName()),
+        rs -> new HostCount(new Host(rs.getString(1)), rs.getInt(2)));
   }
 
-  public String queuedTableName() {
+  private String queuedTableName() {
     return this.tableName(JdbcStore.QUEUED_STORE);
   }
 }

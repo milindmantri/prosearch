@@ -76,6 +76,8 @@ public class Manager
   private Host[] startUrls;
   private PrimitiveIterator.OfInt nextHostIndex;
 
+  private ProCrawler crawler;
+
   private final GenericDelayResolver delayResolver =
       new GenericDelayResolver() {
         @Override
@@ -145,6 +147,10 @@ public class Manager
     this.nextHostIndex = IntStream.iterate(0, i -> (i + 1) % this.startUrls.length).iterator();
   }
 
+  public void setCrawler(ProCrawler crwl) {
+    this.crawler = crwl;
+  }
+
   @Override
   public boolean acceptMetadata(final String ref, final Properties metadata) {
     final boolean isContentValid =
@@ -205,26 +211,26 @@ public class Manager
     return acceptHost(new Host(URI.create(context.getDocument().getReference())));
   }
 
-  public void restoreCount(final JdbcStoreEngine engine) throws SQLException {
+  public void restoreCount() throws SQLException {
+    var engine = (JdbcStoreEngine) this.crawler.getDataStoreEngine();
 
-    if (engine.hasQueuedTable()) {
-      restoreInternal(
-          """
-        SELECT DISTINCT host, 0 as c
-        FROM %s
-        GROUP BY host
-        """
-              .formatted(engine.queuedTableName()));
+    Stream<HostCount> queued = engine.queuedEntries();
+
+    Stream<HostCount> domainStats =
+        queryDb(
+            this.dataSource,
+            """
+            SELECT
+              host, count(*)
+            FROM
+              domain_stats
+            GROUP BY host
+            """,
+            rs -> new HostCount(new Host(rs.getString(1)), rs.getInt(2)));
+
+    try (var stream = Stream.concat(queued, domainStats)) {
+      stream.forEachOrdered(hc -> this.count.put(hc.host(), new AtomicInteger(hc.count())));
     }
-
-    restoreInternal(
-        """
-    SELECT
-      host, count(*)
-    FROM
-      domain_stats
-    GROUP BY host
-    """);
   }
 
   static class WrappedSqlException extends RuntimeException {
@@ -253,44 +259,46 @@ public class Manager
     }
   }
 
-  void restoreInternal(final String sql) throws SQLException {
-    try (var con = this.dataSource.getConnection();
-        var ps = con.prepareStatement(sql)) {
+  /** Caller needs to close the stream */
+  public static <T> Stream<T> queryDb(
+      final DataSource ds, final String sql, final ResultSetHandler<T> handler)
+      throws SQLException {
 
-      ResultSet rs = ps.executeQuery();
+    var con = ds.getConnection();
+    var ps = con.prepareStatement(sql);
 
-      try {
-        Stream.iterate(
-                rs,
-                resultSet -> {
-                  try {
-                    return resultSet.next();
-                  } catch (SQLException e) {
-                    throw new WrappedSqlException(e);
-                  }
-                },
-                resultSet -> resultSet)
-            .forEach(
-                resultSet -> {
-                  try {
-                    this.count.put(
-                        new Host(resultSet.getString(1)), new AtomicInteger(resultSet.getInt(2)));
-                  } catch (SQLException e) {
-                    throw new WrappedSqlException(e);
-                  }
-                });
-      } catch (WrappedSqlException e) {
-        throw ((SQLException) e.getCause());
-      }
+    ResultSet rs = ps.executeQuery();
 
-    } catch (final SQLException ex) {
-      // check if table exists
-      if (!PG_UNDEFINED_RELATION_ERR_CODE.equals(ex.getSQLState())) {
-        // https://www.postgresql.org/docs/current/errcodes-appendix.html
-        // table exists, but fetch failed. Don't throw if table doesn't exist.
-
-        throw ex;
-      }
+    try {
+      return Stream.iterate(
+              rs,
+              resultSet -> {
+                try {
+                  return resultSet.next();
+                } catch (SQLException e) {
+                  throw new WrappedSqlException(e);
+                }
+              },
+              resultSet -> resultSet)
+          .map(
+              resultSet -> {
+                try {
+                  return handler.accept(resultSet);
+                } catch (SQLException e) {
+                  throw new WrappedSqlException(e);
+                }
+              })
+          .onClose(
+              () -> {
+                try {
+                  con.close();
+                  ps.close();
+                } catch (SQLException e) {
+                  throw new WrappedSqlException(e);
+                }
+              });
+    } catch (WrappedSqlException e) {
+      throw ((SQLException) e.getCause());
     }
   }
 

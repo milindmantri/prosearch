@@ -55,6 +55,10 @@ public class ProCrawler extends HttpCrawler {
 
   @Override
   protected void beforeCrawlerExecution(final boolean resume) {
+    // init is guaranteed to be called by the lib
+
+    this.manager.setCrawler(this);
+
     super.beforeCrawlerExecution(resume);
 
     // initial queue is not set correctly if the crawler fails when doing initial crawl
@@ -67,7 +71,8 @@ public class ProCrawler extends HttpCrawler {
       }
 
       this.manager.createStatsTableIfNotExists();
-      manager.restoreCount((JdbcStoreEngine) this.config.getDataStoreEngine());
+
+      manager.restoreCount();
 
     } catch (SQLException e) {
       throw new RuntimeException(e);
