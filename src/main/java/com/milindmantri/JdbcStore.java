@@ -205,7 +205,7 @@ public class JdbcStore<T> implements IDataStore<T> {
 
       var host = new Host(URI.create(rec.id));
       // if limit is reached, we can delete all items for that host from queue
-      if (isQueued() && !manager.acceptHost(host)) {
+      if (isQueued() && !manager.isAcceptable(host)) {
         executeWrite("DELETE FROM <table> WHERE host = ?", ps -> ps.setString(1, host.toString()));
 
         return Optional.empty();

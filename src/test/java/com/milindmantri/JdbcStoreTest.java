@@ -283,6 +283,68 @@ class JdbcStoreTest {
     }
   }
 
+  @Test
+  void limitReachedButRecrawling() throws SQLException {
+    String site = "http://example.com/";
+
+    Manager dc = new Manager(1, ds, Stream.of(site).map(URI::create));
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create(site + "1"), 0);
+
+    try (var es = EngineStore.queueStore(dc)) {
+      ManagerTest.queue(
+          dc,
+          es.store(),
+          Stream.of(
+              new ManagerTest.SiteLink(site, 2),
+              new ManagerTest.SiteLink(site, 3),
+              new ManagerTest.SiteLink(site, 4)));
+
+      assertTrue(es.store().deleteFirst().isPresent());
+      assertTrue(es.store().deleteFirst().isPresent());
+      assertEquals(1, es.store().count());
+    }
+  }
+
+  @Test
+  void limitReachedButRecrawling2() throws SQLException {
+    String s1 = "http://example.com/";
+    String s2 = "http://example2.com/";
+
+    Manager dc = new Manager(1, ds, Stream.of(s1, s2).map(URI::create));
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(s1));
+    dc.accept(qEvent(s2));
+    // limit reached
+    dc.saveProcessed(URI.create(s1 + "1"), 0);
+    dc.saveProcessed(URI.create(s2 + "1"), 0);
+
+    // s21 s22 s23
+    try (var es = EngineStore.queueStore(dc)) {
+      ManagerTest.queue(
+          dc,
+          es.store(),
+          Stream.of(
+              new ManagerTest.SiteLink(s2, 2),
+              new ManagerTest.SiteLink(s2, 3),
+              new ManagerTest.SiteLink(s2, 4)));
+
+      // missed s1
+      assertTrue(es.store().deleteFirst().get().getReference().contains(s2));
+      assertEquals(2, es.store().count());
+    }
+  }
+
   record EngineStore(JdbcStoreEngine engine, JdbcStore<CrawlDocInfo> store) implements Closeable {
 
     @Override

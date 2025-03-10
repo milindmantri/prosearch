@@ -367,14 +367,15 @@ class ManagerTest {
 
   record SiteLink(String site, int link) {}
 
-  void queue(Manager m, JdbcStore<CrawlDocInfo> store, Stream<SiteLink> sl) {
+  static void queue(Manager m, JdbcStore<CrawlDocInfo> store, Stream<SiteLink> sl) {
 
     sl.map(s -> s.site() + s.link())
         .peek(s -> m.accept(qEvent(s)))
         .forEach(s -> store.save(s, genDoc(s)));
   }
 
-  void queueWithoutSave(JdbcStore<CrawlDocInfo> store, Stream<SiteLink> sl) throws SQLException {
+  static void queueWithoutSave(JdbcStore<CrawlDocInfo> store, Stream<SiteLink> sl)
+      throws SQLException {
 
     try (var con = datasource.getConnection();
         var ps =

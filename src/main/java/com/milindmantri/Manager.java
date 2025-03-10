@@ -162,10 +162,10 @@ public class Manager
 
     // ref is already normalized
     final Host host = new Host(URI.create(normalized));
-    return this.isRecrawling() || acceptHost(host);
+    return isAcceptable(host);
   }
 
-  private boolean isRecrawling() {
+  boolean isRecrawling() {
     return this.crawler != null && this.crawler.isRecrawling();
   }
 
@@ -339,7 +339,7 @@ public class Manager
     return this.count.containsKey(host);
   }
 
-  public boolean acceptHost(Host host) {
+  private boolean acceptHost(Host host) {
 
     if (isQueuedOnce(host)) {
       AtomicInteger i = count.get(host);
@@ -348,6 +348,10 @@ public class Manager
     } else {
       return false;
     }
+  }
+
+  public boolean isAcceptable(Host host) {
+    return isRecrawling() || acceptHost(host);
   }
 
   /** Helper to get next host to pull entry from queue */
@@ -369,7 +373,7 @@ public class Manager
         }
 
         host = this.startUrls[i];
-      } while (!acceptHost(host) && this.nextHostIndex.hasNext());
+      } while (!isAcceptable(host) && this.nextHostIndex.hasNext());
 
       return Optional.of(host);
     }
