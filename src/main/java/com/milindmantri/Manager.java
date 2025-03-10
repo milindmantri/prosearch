@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
-import org.apache.poi.ss.formula.functions.T;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +71,7 @@ public class Manager
   private final DataSource dataSource;
   // TODO: make final
   private Host[] startUrls;
-  private SequencedSet<URI> startUrlsSet;
+  private SequencedSet<Host> startUrlsSet;
   private PrimitiveIterator.OfInt nextHostIndex;
 
   private ProCrawler crawler;
@@ -108,8 +107,9 @@ public class Manager
       throws SQLException {
     this(limit, dataSource);
 
-    this.startUrlsSet = startUrls.collect(Collectors.toCollection(LinkedHashSet::new));
-    this.startUrls = this.startUrlsSet.stream().map(Host::new).toArray(Host[]::new);
+    this.startUrlsSet =
+        startUrls.map(Host::new).collect(Collectors.toCollection(LinkedHashSet::new));
+    this.startUrls = this.startUrlsSet.toArray(Host[]::new);
     // infinite stream over index
     this.nextHostIndex = IntStream.iterate(0, i -> (i + 1) % this.startUrls.length).iterator();
   }
@@ -183,10 +183,14 @@ public class Manager
     }
 
     boolean isAccepted = acceptHost(host);
+    boolean hasStartUrlFormat =
+        (uri.getPath() == null || uri.getPath().isEmpty() || "/".equals(uri.getPath()))
+            && uri.getQuery() == null
+            && uri.getFragment() == null;
 
     // when recrawling, and start urls could be http which may not be found. Need to allow links
     // equal or close to start url to enqueue the crawled links and begin the recrawl
-    if (this.isRecrawling() && this.startUrlsSet.contains(uri)) {
+    if (this.isRecrawling() && hasStartUrlFormat && this.startUrlsSet.contains(host)) {
       return true;
     }
     if (isAccepted) {

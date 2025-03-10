@@ -22,9 +22,12 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.mockito.Mockito;
 
+@TestMethodOrder(MethodOrderer.Random.class)
 class ManagerTest {
 
   // NOTE: Ensure PG is running on local and "test" DB exists.
@@ -937,13 +940,17 @@ class ManagerTest {
   @Test
   void importerStageRecrawlNotStartUrl() throws SQLException {
     var site = "http://site.com";
-    var dc = new Manager(3, datasource, Stream.of(site).map(URI::create));
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
 
     var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
     // appears new doc since no entry of past
     Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
         .thenReturn(true);
     Mockito.when(context.getDocument().getReference()).thenReturn("http://site2.com");
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
 
     dc.accept(qEvent(site));
     // limit reached
@@ -952,7 +959,97 @@ class ManagerTest {
     assertFalse(dc.execute(context));
   }
 
-  // accept close start url https, /, empty path (when recrawl)
+  @Test
+  void importerStageRecrawlCloseStartUrl() throws SQLException {
+    var site = "http://site.com/";
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    // notice missing "/" at the end
+    Mockito.when(context.getDocument().getReference()).thenReturn("http://site.com");
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+    assertTrue(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlCloseStartUrl2() throws SQLException {
+    var site = "http://site.com/";
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    // notice https
+    Mockito.when(context.getDocument().getReference()).thenReturn("https://site.com/");
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+    assertTrue(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlCloseStartUrl3() throws SQLException {
+    var site = "http://site.com/";
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    // notice https
+    Mockito.when(context.getDocument().getReference()).thenReturn("https://site.com/?hello=world");
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+    assertFalse(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlCloseStartUrlFrag() throws SQLException {
+    var site = "http://site.com/";
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+      .thenReturn(true);
+    // notice https
+    Mockito.when(context.getDocument().getReference()).thenReturn("https://site.com/#fragment");
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+    assertFalse(dc.execute(context));
+  }
 
   @Test
   void importerStageRecrawlNonStartUrl() throws SQLException {
@@ -974,22 +1071,6 @@ class ManagerTest {
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
     assertFalse(dc.execute(context));
-  }
-
-  @Test
-  void importerStageRecrawlCloseStartUrl() throws SQLException {
-    var site = "http://site.com";
-    var dc = new Manager(3, datasource, Stream.of(site).map(URI::create));
-
-    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
-    // appears new doc since no entry of past
-    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
-        .thenReturn(true);
-    Mockito.when(context.getDocument().getReference()).thenReturn(site);
-
-    dc.accept(qEvent(site));
-
-    assertTrue(dc.execute(context));
   }
 
   static Event qEvent(String link) {
