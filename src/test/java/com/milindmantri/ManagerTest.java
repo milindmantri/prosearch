@@ -915,8 +915,11 @@ class ManagerTest {
     dc.setCrawler(crwl);
 
     dc.accept(qEvent(site));
+    try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
+      Mockito.when(crwl.getDataStoreEngine()).thenReturn(es.engine());
 
-    assertTrue(dc.execute(context));
+      assertTrue(dc.execute(context));
+    }
   }
 
   @Test
@@ -979,7 +982,10 @@ class ManagerTest {
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
-    assertTrue(dc.execute(context));
+    try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
+      Mockito.when(crwl.getDataStoreEngine()).thenReturn(es.engine());
+      assertTrue(dc.execute(context));
+    }
   }
 
   @Test
@@ -1002,7 +1008,10 @@ class ManagerTest {
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
-    assertTrue(dc.execute(context));
+    try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
+      Mockito.when(crwl.getDataStoreEngine()).thenReturn(es.engine());
+      assertTrue(dc.execute(context));
+    }
   }
 
   @Test
@@ -1036,7 +1045,7 @@ class ManagerTest {
     var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
     // appears new doc since no entry of past
     Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
-      .thenReturn(true);
+        .thenReturn(true);
     // notice https
     Mockito.when(context.getDocument().getReference()).thenReturn("https://site.com/#fragment");
 
@@ -1049,6 +1058,37 @@ class ManagerTest {
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
     assertFalse(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlLaterStartUrl() throws SQLException {
+    var site = "http://site.com/";
+    var host = new Host(URI.create(site));
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn("http://site.com/");
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    // adding entries to queue (can only happen when start url has already been processed)
+    try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
+      Mockito.when(crwl.getDataStoreEngine()).thenReturn(es.engine());
+      es.store().save(site + "link2", new CrawlDocInfo(site + "link2"));
+      es.store().save(site + "link3", new CrawlDocInfo(site + "link3"));
+      es.store().save(site + "link4", new CrawlDocInfo(site + "link4"));
+
+      dc.accept(qEvent(site));
+      // limit reached
+      dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+      assertFalse(dc.execute(context));
+    }
   }
 
   @Test

@@ -372,6 +372,32 @@ public class JdbcStoreEngine implements IDataStoreEngine, IXMLConfigurable {
     }
   }
 
+  public boolean isQueueEmptyForHost(final Host host) {
+    if (this.tableExist(queuedTableName())) {
+
+      try (var con = this.datasource.getConnection();
+          var ps =
+              con.prepareStatement(
+                  "SELECT COUNT(*) FROM %s WHERE host = ?".formatted(queuedTableName()))) {
+        ps.setString(1, host.toString());
+        var rs = ps.executeQuery();
+
+        while (rs.next()) {
+
+          // start url has been dequeued in the imported pipeline, so it shouldn't exist in queue
+          if (rs.getInt(1) == 0) {
+            return true;
+          }
+        }
+        return false;
+      } catch (SQLException e) {
+        throw new DataStoreException("Could not check if queue is empty.", e);
+      }
+    } else {
+      throw new DataStoreException("queue table does not exist.");
+    }
+  }
+
   private String cachedTableName() {
     return this.tableName(JdbcStore.CACHED_STORE);
   }

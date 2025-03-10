@@ -169,6 +169,15 @@ public class Manager
     return this.crawler != null && this.crawler.isRecrawling();
   }
 
+  private JdbcStoreEngine getEngine() {
+    if (this.crawler != null) {
+      return (JdbcStoreEngine) this.crawler.getDataStoreEngine();
+
+    } else {
+      throw new IllegalStateException("crawler not initialized.");
+    }
+  }
+
   @Override
   public boolean execute(final ImporterPipelineContext context) {
     // crawler lib never writes to cache store unless it is recrawling, where it renames processed
@@ -191,7 +200,7 @@ public class Manager
     // when recrawling, and start urls could be http which may not be found. Need to allow links
     // equal or close to start url to enqueue the crawled links and begin the recrawl
     if (this.isRecrawling() && hasStartUrlFormat && this.startUrlsSet.contains(host)) {
-      return true;
+      return this.getEngine().isQueueEmptyForHost(host);
     }
     if (isAccepted) {
       return true;
