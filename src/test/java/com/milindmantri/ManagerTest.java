@@ -862,6 +862,7 @@ class ManagerTest {
     var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
     Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
         .thenReturn(false);
+    Mockito.when(context.getDocument().getReference()).thenReturn(site);
 
     assertTrue(dc.execute(context));
   }
@@ -886,6 +887,102 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
 
     var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn(site);
+
+    dc.accept(qEvent(site));
+
+    assertTrue(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlStartUrl() throws SQLException {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn(site);
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(site));
+
+    assertTrue(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlNotCloseStartUrl() throws SQLException {
+    var site = "http://site.com";
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn(site + "/1234");
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+    assertFalse(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlNotStartUrl() throws SQLException {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn("http://site2.com");
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+    assertFalse(dc.execute(context));
+  }
+
+  // accept close start url https, /, empty path (when recrawl)
+
+  @Test
+  void importerStageRecrawlNonStartUrl() throws SQLException {
+    var site = "http://site.com";
+    var dc = new Manager(1, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
+    Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
+        .thenReturn(true);
+    Mockito.when(context.getDocument().getReference()).thenReturn("http://site.com/hello-world");
+
+    var crwl = Mockito.mock(ProCrawler.class);
+    Mockito.when(crwl.isRecrawling()).thenReturn(true);
+    dc.setCrawler(crwl);
+
+    dc.accept(qEvent(site));
+    // limit reached
+    dc.saveProcessed(URI.create("http://site.com/link1"), 0);
+
+    assertFalse(dc.execute(context));
+  }
+
+  @Test
+  void importerStageRecrawlCloseStartUrl() throws SQLException {
+    var site = "http://site.com";
+    var dc = new Manager(3, datasource, Stream.of(site).map(URI::create));
+
+    var context = Mockito.mock(ImporterPipelineContext.class, RETURNS_DEEP_STUBS);
+    // appears new doc since no entry of past
     Mockito.when(context.getDocument().getMetadata().getBoolean(CrawlDocMetadata.IS_CRAWL_NEW))
         .thenReturn(true);
     Mockito.when(context.getDocument().getReference()).thenReturn(site);

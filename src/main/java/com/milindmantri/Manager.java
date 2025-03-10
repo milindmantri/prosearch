@@ -19,12 +19,15 @@ import com.norconex.commons.lang.text.TextMatcher;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.PrimitiveIterator;
+import java.util.SequencedSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
@@ -69,6 +72,7 @@ public class Manager
   private final DataSource dataSource;
   // TODO: make final
   private Host[] startUrls;
+  private SequencedSet<URI> startUrlsSet;
   private PrimitiveIterator.OfInt nextHostIndex;
 
   private ProCrawler crawler;
@@ -104,7 +108,8 @@ public class Manager
       throws SQLException {
     this(limit, dataSource);
 
-    this.startUrls = startUrls.map(Host::new).toArray(Host[]::new);
+    this.startUrlsSet = startUrls.collect(Collectors.toCollection(LinkedHashSet::new));
+    this.startUrls = this.startUrlsSet.stream().map(Host::new).toArray(Host[]::new);
     // infinite stream over index
     this.nextHostIndex = IntStream.iterate(0, i -> (i + 1) % this.startUrls.length).iterator();
   }
@@ -169,13 +174,21 @@ public class Manager
     // crawler lib never writes to cache store unless it is recrawling, where it renames processed
     // to cached and starts going over start urls and cached.
 
+    URI uri = URI.create(context.getDocument().getReference());
+    Host host = new Host(uri);
+
     // recrawling, as it is only set when doc is found in cache
     if (!context.getDocument().getMetadata().getBoolean(IS_CRAWL_NEW)) {
       return true;
     }
 
-    boolean isAccepted = acceptHost(new Host(URI.create(context.getDocument().getReference())));
+    boolean isAccepted = acceptHost(host);
 
+    // when recrawling, and start urls could be http which may not be found. Need to allow links
+    // equal or close to start url to enqueue the crawled links and begin the recrawl
+    if (this.isRecrawling() && this.startUrlsSet.contains(uri)) {
+      return true;
+    }
     if (isAccepted) {
       return true;
     } else {
