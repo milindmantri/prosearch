@@ -128,7 +128,7 @@ impl IndexServer {
         }
     }
 
-    fn search(&self, q: String, num_hits: usize, offset: usize) -> tantivy::Result<Serp> {
+    fn search(&self, q: String, num_hits: usize, _offset: usize) -> tantivy::Result<Serp> {
         let query = self
             .query_parser
             .parse_query(&q)
@@ -141,7 +141,7 @@ impl IndexServer {
             let _search_timer = timer_tree.open("search");
             searcher.search(
                 &query,
-                &(TopDocs::with_limit(num_hits).and_offset(offset)),
+                &(TopDocs::with_limit(num_hits)),
             )?
         };
 
