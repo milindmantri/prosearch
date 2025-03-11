@@ -46,6 +46,7 @@ use tantivy::TantivyError::InvalidArgument;
 use tantivy::snippet::{SnippetGenerator};
 use tantivy::snippet::Snippet;
 use tantivy::schema::Field;
+use tantivy::ReloadPolicy;
 use urlencoded::UrlEncodedQuery;
 use bodyparser::Json;
 use serde_json::Map;
@@ -106,7 +107,9 @@ impl IndexServer {
         query_parser.set_field_boost(body_field, 1.5);
         // description field by default has a boost of 1.0
 
-        let reader = index.reader()?;
+        let reader = index.reader_builder()
+            .reload_policy(ReloadPolicy::OnCommitWithDelay)
+            .try_into()?;
         let writer : IndexWriter = index.writer(50_000_000)?;
         Ok(IndexServer {
             reader,
@@ -209,8 +212,6 @@ impl IndexServer {
         let _ = writer.delete_term(term.clone());
         let _ = writer.commit();
 
-        let _ = self.reader.reload();
-
         Ok("true".to_string())
     }
 
@@ -274,7 +275,6 @@ impl IndexServer {
                 let writer = &mut self.writer;
                 let _ = writer.add_document(doc);
                 let _ = writer.commit();
-                let _ = self.reader.reload();
                 Ok(content_length.to_string())
             }
             Err(err) => Err(err.into())
