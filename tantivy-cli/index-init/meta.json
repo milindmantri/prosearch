@@ -10,12 +10,12 @@
       "type": "text",
       "options": {
         "indexing": {
-          "record": "position",
+          "record": "basic",
           "fieldnorms": true,
-          "tokenizer": "en_stem"
+          "tokenizer": "whitespace"
         },
         "stored": true,
-        "fast": true
+        "fast": false
       }
     },
     {
@@ -23,12 +23,12 @@
       "type": "text",
       "options": {
         "indexing": {
-          "record": "position",
+          "record": "freq",
           "fieldnorms": true,
           "tokenizer": "en_stem"
         },
         "stored": true,
-        "fast": true
+        "fast": false
       }
     },
     {
@@ -38,10 +38,10 @@
         "indexing": {
           "record": "position",
           "fieldnorms": true,
-          "tokenizer": "en_stem"
+          "tokenizer": "whitespace"
         },
         "stored": true,
-        "fast": true
+        "fast": false
       }
     },
     {
@@ -50,7 +50,7 @@
       "options": {
         "indexing": {
           "record": "basic",
-          "fieldnorms": true,
+          "fieldnorms": false,
           "tokenizer": "raw"
         },
         "stored": true,
