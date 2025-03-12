@@ -4,11 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 
 import com.norconex.collector.core.crawler.Crawler;
-import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.doc.CrawlDocInfo;
 import com.norconex.collector.core.doc.CrawlDocMetadata;
 import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
-import com.norconex.commons.lang.event.Event;
 import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
 import java.sql.Connection;
@@ -79,7 +77,7 @@ class ManagerTest {
     assertTrue(
         IntStream.range(0, 3)
             .mapToObj("http://host.com/%d"::formatted)
-            .peek(s -> dc.accept(qEvent(s)))
+            .peek(s -> dc.initCount(qEvent(s)))
             .allMatch(
                 s -> {
                   try {
@@ -157,7 +155,7 @@ class ManagerTest {
 
     final String link = "https://www.php.net/new-link?hello=work";
 
-    dc.accept(qEvent(link));
+    dc.initCount(qEvent(link));
     dc.saveProcessed(URI.create(link), 0);
 
     try (var con = datasource.getConnection();
@@ -180,7 +178,7 @@ class ManagerTest {
 
     final String link = "https://www.php.net/new-link#fragment-data";
 
-    dc.accept(qEvent(link));
+    dc.initCount(qEvent(link));
     dc.saveProcessed(URI.create(link), 0);
 
     try (var con = datasource.getConnection();
@@ -230,7 +228,7 @@ class ManagerTest {
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link2";
 
-    dc.accept(qEvent(link1));
+    dc.initCount(qEvent(link1));
 
     assertTrue(dc.saveProcessed(URI.create(link1), 0));
     assertTrue(dc.saveProcessed(URI.create(link2), 0));
@@ -259,7 +257,7 @@ class ManagerTest {
     final String link1 = "https://www.php.net/new-link";
     final String link2 = "https://www.php.net/new-link#frag-on-same-link";
 
-    dc.accept(qEvent(link1));
+    dc.initCount(qEvent(link1));
     assertTrue(dc.saveProcessed(URI.create(link1), 0));
     assertFalse(dc.saveProcessed(URI.create(link2), 0));
 
@@ -296,7 +294,7 @@ class ManagerTest {
     assertTrue(
         IntStream.range(0, 3)
             .mapToObj("http://host.com/%d"::formatted)
-            .peek(s -> dc.accept(qEvent(s)))
+            .peek(s -> dc.initCount(qEvent(s)))
             .allMatch(
                 str -> {
                   try {
@@ -328,7 +326,7 @@ class ManagerTest {
         IntStream.range(0, 2)
             .<Function<Integer, String>>mapToObj(i -> (s -> "http://site" + s + ".com/" + i))
             .flatMap(s -> Stream.of(s.apply(2), s.apply(1)))
-            .peek(s -> dc.accept(qEvent(s)))
+            .peek(s -> dc.initCount(qEvent(s)))
             .allMatch(
                 str -> {
                   try {
@@ -352,7 +350,7 @@ class ManagerTest {
         IntStream.range(0, 3)
             .<Function<String, String>>mapToObj(i -> (s -> s + "/" + i))
             .flatMap(s -> Stream.of(s.apply(s2), s.apply(s1)))
-            .peek(s -> dc.accept(qEvent(s)))
+            .peek(s -> dc.initCount(qEvent(s)))
             .allMatch(
                 str -> {
                   try {
@@ -370,7 +368,7 @@ class ManagerTest {
   static void queue(Manager m, JdbcStore<CrawlDocInfo> store, Stream<SiteLink> sl) {
 
     sl.map(s -> s.site() + s.link())
-        .peek(s -> m.accept(qEvent(s)))
+        .peek(s -> m.initCount(qEvent(s)))
         .forEach(s -> store.save(s, genDoc(s)));
   }
 
@@ -480,7 +478,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertTrue(dc.saveProcessed(URI.create(url), 0));
     assertFalse(dc.saveProcessed(URI.create(url), 0));
 
@@ -499,7 +497,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertThrows(
         IllegalArgumentException.class, () -> dc.saveProcessed(URI.create(":invalid:/uri"), 0));
 
@@ -539,7 +537,7 @@ class ManagerTest {
     assertTrue(
         IntStream.rangeClosed(1, 2)
             .mapToObj(i -> "http://" + host + "/page" + i)
-            .peek(s -> dc.accept(qEvent(s)))
+            .peek(s -> dc.initCount(qEvent(s)))
             .allMatch(
                 s -> {
                   try {
@@ -551,7 +549,7 @@ class ManagerTest {
 
     // Third URL should fail
     String url = "http://" + host + "/page3";
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertFalse(dc.saveProcessed(URI.create(url), 0));
 
     try (var con = datasource.getConnection();
@@ -569,7 +567,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
 
     // Drop table to simulate database error
     dropTable();
@@ -583,7 +581,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertThrows(NullPointerException.class, () -> dc.saveProcessed(null, 0));
 
     try (var con = datasource.getConnection();
@@ -602,12 +600,12 @@ class ManagerTest {
 
     // First host
     String url1 = "http://example1.com/page";
-    dc.accept(qEvent(url1));
+    dc.initCount(qEvent(url1));
     assertTrue(dc.saveProcessed(URI.create(url1), 0));
 
     // Second host
     String url2 = "http://example2.com/page";
-    dc.accept(qEvent(url2));
+    dc.initCount(qEvent(url2));
     assertTrue(dc.saveProcessed(URI.create(url2), 0));
 
     try (var con = datasource.getConnection();
@@ -635,7 +633,7 @@ class ManagerTest {
 
       String url = "http://example.com/page";
 
-      dc.accept(qEvent(url));
+      dc.initCount(qEvent(url));
 
       assertThrows(SQLException.class, () -> dc.saveProcessed(URI.create(url), 0));
       assertEquals(0, dc.count(new Host("example.com"))); // Should rollback local count
@@ -647,7 +645,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertTrue(dc.saveProcessed(URI.create(url), 0));
     assertEquals(1, dc.count(new Host("example.com")));
 
@@ -668,7 +666,7 @@ class ManagerTest {
     String url = "http://example.com/page";
     String nonExistentUrl = "http://example.com/nonexistent";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertTrue(dc.saveProcessed(URI.create(url), 0));
     assertEquals(1, dc.count(new Host("example.com")));
 
@@ -689,8 +687,8 @@ class ManagerTest {
     String url1 = "http://example.com/page1";
     String url2 = "http://example.com/page2";
 
-    dc.accept(qEvent(url1));
-    dc.accept(qEvent(url2));
+    dc.initCount(qEvent(url1));
+    dc.initCount(qEvent(url2));
     assertTrue(dc.saveProcessed(URI.create(url1), 0));
     assertTrue(dc.saveProcessed(URI.create(url2), 0));
     assertEquals(2, dc.count(new Host("example.com")));
@@ -714,7 +712,7 @@ class ManagerTest {
       var dc = new Manager(3, ds);
       String url = "http://example.com/page";
 
-      dc.accept(qEvent(url));
+      dc.initCount(qEvent(url));
       assertTrue(dc.saveProcessed(URI.create(url), 0));
       assertEquals(1, dc.count(new Host("example.com")));
 
@@ -738,7 +736,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertTrue(dc.saveProcessed(URI.create(url), 0));
     assertEquals(1, dc.count(new Host("example.com")));
 
@@ -757,7 +755,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertTrue(dc.saveProcessed(URI.create(url), 0));
     assertEquals(1, dc.count(new Host("example.com")));
 
@@ -777,7 +775,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
     assertTrue(dc.saveProcessed(URI.create(url), 0));
     assertEquals(1, dc.count(new Host("example.com")));
 
@@ -793,8 +791,8 @@ class ManagerTest {
     String url1 = "http://example1.com/page";
     String url2 = "http://example2.com/page";
 
-    dc.accept(qEvent(url1));
-    dc.accept(qEvent(url2));
+    dc.initCount(qEvent(url1));
+    dc.initCount(qEvent(url2));
     assertTrue(dc.saveProcessed(URI.create(url1), 0));
     assertTrue(dc.saveProcessed(URI.create(url2), 0));
 
@@ -819,7 +817,7 @@ class ManagerTest {
     var dc = new Manager(3, datasource);
     String url = "http://example.com/page";
 
-    dc.accept(qEvent(url));
+    dc.initCount(qEvent(url));
 
     assertFalse(dc.deleteProcessed(URI.create(url)));
   }
@@ -843,7 +841,7 @@ class ManagerTest {
   void acceptRefQueued() {
     var site = "http://site.com";
     var dc = new Manager(3, datasource);
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     assertTrue(dc.acceptReference(site));
   }
 
@@ -895,7 +893,7 @@ class ManagerTest {
         .thenReturn(true);
     Mockito.when(context.getDocument().getReference()).thenReturn(site);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
 
     assertTrue(dc.execute(context));
   }
@@ -915,7 +913,7 @@ class ManagerTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     try (var es = JdbcStoreTest.EngineStore.queueStore(dc)) {
       Mockito.when(crwl.getDataStoreEngine()).thenReturn(es.engine());
 
@@ -934,7 +932,7 @@ class ManagerTest {
         .thenReturn(true);
     Mockito.when(context.getDocument().getReference()).thenReturn(site + "/1234");
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
@@ -956,7 +954,7 @@ class ManagerTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
@@ -979,7 +977,7 @@ class ManagerTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
@@ -1005,7 +1003,7 @@ class ManagerTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
@@ -1031,7 +1029,7 @@ class ManagerTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
@@ -1054,7 +1052,7 @@ class ManagerTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
@@ -1084,7 +1082,7 @@ class ManagerTest {
       es.store().save(site + "link3", new CrawlDocInfo(site + "link3"));
       es.store().save(site + "link4", new CrawlDocInfo(site + "link4"));
 
-      dc.accept(qEvent(site));
+      dc.initCount(qEvent(site));
       // limit reached
       dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
@@ -1107,17 +1105,15 @@ class ManagerTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
     assertFalse(dc.execute(context));
   }
 
-  static Event qEvent(String link) {
-    return new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, mockCrawler)
-        .crawlDocInfo(new CrawlDocInfo(link))
-        .build();
+  static Host qEvent(String link) {
+    return new Host(URI.create(link));
   }
 
   static CrawlDocInfo genDoc(String link) {

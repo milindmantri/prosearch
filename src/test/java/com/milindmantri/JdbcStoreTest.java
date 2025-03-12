@@ -143,7 +143,7 @@ class JdbcStoreTest {
 
     Manager dc = new Manager(3, ds, Stream.of(s1, s2).map(URI::create));
     Stream.of(s1, s2)
-        .peek(s -> dc.accept(qEvent(s)))
+        .peek(s -> dc.initCount(qEvent(s)))
         .forEach(
             s -> {
               try {
@@ -181,7 +181,7 @@ class JdbcStoreTest {
 
     Manager dc = new Manager(3, ds, Stream.of(s1, s2).map(URI::create));
     Stream.of(s1, s2)
-        .peek(s -> dc.accept(qEvent(s)))
+        .peek(s -> dc.initCount(qEvent(s)))
         .forEach(
             s -> {
               try {
@@ -218,7 +218,7 @@ class JdbcStoreTest {
     final String s1 = "http://site1.com";
 
     Manager dc = new Manager(2, ds, Stream.of(s1).map(URI::create));
-    dc.accept(qEvent(s1));
+    dc.initCount(qEvent(s1));
 
     try (var es = EngineStore.queueStore(dc)) {
       var store = es.store();
@@ -293,7 +293,7 @@ class JdbcStoreTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(site));
+    dc.initCount(qEvent(site));
     // limit reached
     dc.saveProcessed(URI.create(site + "1"), 0);
 
@@ -323,8 +323,8 @@ class JdbcStoreTest {
     Mockito.when(crwl.isRecrawling()).thenReturn(true);
     dc.setCrawler(crwl);
 
-    dc.accept(qEvent(s1));
-    dc.accept(qEvent(s2));
+    dc.initCount(qEvent(s1));
+    dc.initCount(qEvent(s2));
     // limit reached
     dc.saveProcessed(URI.create(s1 + "1"), 0);
     dc.saveProcessed(URI.create(s2 + "1"), 0);

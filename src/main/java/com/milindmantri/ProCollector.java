@@ -10,8 +10,7 @@ public class ProCollector extends HttpCollector {
 
   private final Manager manager;
 
-  public ProCollector(
-      final HttpCollectorConfig collectorConfig, final Manager manager) {
+  public ProCollector(final HttpCollectorConfig collectorConfig, final Manager manager) {
     super(collectorConfig);
     this.manager = manager;
   }

@@ -1,6 +1,5 @@
 package com.milindmantri;
 
-import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.doc.CrawlDocInfo;
 import com.norconex.collector.core.pipeline.DocInfoPipelineContext;
 import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
@@ -14,6 +13,7 @@ import com.norconex.collector.http.pipeline.queue.HttpQueuePipeline;
 import com.norconex.collector.http.pipeline.queue.HttpQueuePipelineContext;
 import com.norconex.commons.lang.pipeline.IPipelineStage;
 import com.norconex.importer.response.ImporterResponse;
+import java.net.URI;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -49,14 +49,7 @@ public class ProCrawler extends HttpCrawler {
     this.manager = manager;
     this.config = crawlerConfig;
     this.countInitStage =
-        ctx -> {
-          this.manager.accept(
-              new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, this)
-                  .crawlDocInfo(ctx.getDocInfo())
-                  .build());
-
-          return true;
-        };
+        ctx -> this.manager.initCount(new Host(URI.create(ctx.getDocInfo().getReference())));
   }
 
   @Override

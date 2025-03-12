@@ -98,7 +98,6 @@ public final class CrawlerRunner implements Runnable {
         crawlerConfig.setLinkExtractors(htmlLinkExtractor);
 
         crawlerConfig.setReferenceFilters(manager);
-        crawlerConfig.setEventListeners(manager);
         crawlerConfig.setMetadataFilters(manager);
 
         crawlerConfig.setDocumentDeduplicate(true);

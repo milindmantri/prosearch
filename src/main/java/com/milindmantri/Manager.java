@@ -2,7 +2,6 @@ package com.milindmantri;
 
 import static com.norconex.collector.core.doc.CrawlDocMetadata.IS_CRAWL_NEW;
 
-import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.doc.CrawlState;
 import com.norconex.collector.core.filter.IMetadataFilter;
 import com.norconex.collector.core.filter.IReferenceFilter;
@@ -11,8 +10,6 @@ import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
 import com.norconex.collector.http.delay.IDelayResolver;
 import com.norconex.collector.http.delay.impl.AbstractDelayResolver;
 import com.norconex.collector.http.delay.impl.GenericDelayResolver;
-import com.norconex.commons.lang.event.Event;
-import com.norconex.commons.lang.event.IEventListener;
 import com.norconex.commons.lang.map.Properties;
 import com.norconex.commons.lang.pipeline.IPipelineStage;
 import com.norconex.commons.lang.text.TextMatcher;
@@ -35,10 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Manager
-    implements IMetadataFilter,
-        IEventListener<Event>,
-        IReferenceFilter,
-        IPipelineStage<ImporterPipelineContext> {
+    implements IMetadataFilter, IReferenceFilter, IPipelineStage<ImporterPipelineContext> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Manager.class);
 
@@ -131,21 +125,18 @@ public class Manager
     }
   }
 
-  @Override
-  public void accept(final Event event) {
-    // TODO: When non-canonical links are processed (previously enqueued) with the host count
-    // limit reached, canonical refs are rejected by DomainCounter which is a problem since,
-    // we want to follow canonical link and index it instead of the enqueued non-canonical.
+  // TODO: When non-canonical links are processed (previously enqueued) with the host count
+  // limit reached, canonical refs are rejected by DomainCounter which is a problem since,
+  // we want to follow canonical link and index it instead of the enqueued non-canonical.
 
-    // Unfortunately, only a REJECTED_NONCANONICAL is thrown. We need something like a
-    // FOUND_CANONICAL to process correctly even when the host count limit is reached. Until then,
-    // ignoring canonical links (CrawlerConfig).
+  // Unfortunately, only a REJECTED_NONCANONICAL is thrown. We need something like a
+  // FOUND_CANONICAL to process correctly even when the host count limit is reached. Until then,
+  // ignoring canonical links (CrawlerConfig).
 
-    if (event instanceof CrawlerEvent ce && ce.is(CrawlerEvent.DOCUMENT_QUEUED)) {
-      // host has been queued, remove from not queued hosts if it exists there.
-      Host host = new Host(URI.create(ce.getCrawlDocInfo().getReference()));
-      this.count.putIfAbsent(host, new AtomicInteger(0));
-    }
+  public boolean initCount(final Host host) {
+    // host has been queued, remove from not queued hosts if it exists there.
+    this.count.putIfAbsent(host, new AtomicInteger(0));
+    return true;
   }
 
   // This is a faster track to reject URLs when limit is reached instead of doing a HEAD request

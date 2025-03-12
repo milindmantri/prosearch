@@ -42,7 +42,7 @@ class TantivyCommitterTest {
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
       final String link1 = "http://example.com";
-      manager.accept(qEvent(link1));
+      manager.initCount(qEvent(link1));
       assertDoesNotThrow(
           () ->
               tc.doUpsert(
@@ -281,7 +281,7 @@ class TantivyCommitterTest {
       var props = new Properties(Map.of("title", List.of("Example Title")));
 
       final String link1 = "http://example.com/hello-world";
-      manager.accept(qEvent(link1));
+      manager.initCount(qEvent(link1));
       assertDoesNotThrow(
           () ->
               tc.doUpsert(
