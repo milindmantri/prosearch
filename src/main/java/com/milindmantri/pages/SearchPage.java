@@ -9,6 +9,7 @@ import com.milindmantri.TantivyClient;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
+import org.apache.commons.text.StringEscapeUtils;
 
 public class SearchPage {
 
@@ -46,14 +47,25 @@ public class SearchPage {
       margin-bottom: 2rem;
     }
 
+    section div a {
+      text-decoration: none;
+    }
+
     section div h3 {
+      margin: 0.4rem 0;
       font-size: 120%;
-      margin: 0.5rem 0;
     }
 
     section div p {
       margin-top: 0;
+      margin-bottom: 0.3rem;
       line-height: 150%;
+    }
+
+    section div a span {
+      font-size: 0.9rem;
+      display: inline-block;
+      margin-bottom: 0.5rem;
     }
     """;
 
@@ -107,7 +119,7 @@ public class SearchPage {
                 Stream.of(
                     Html.inputText(
                         SearchHttpHandler.QUERY_PARAM,
-                        this.searchTerm,
+                        StringEscapeUtils.escapeHtml4(this.searchTerm),
                         "Type your text here..."))));
 
     if (!this.searchTerm.isBlank()) {
@@ -137,6 +149,9 @@ public class SearchPage {
 
   private static Html divFromSearchResult(final TantivyClient.SearchResult res) {
     return Html.div(
-        Stream.of(Html.a(res.url(), true, Stream.of(Html.h3(res.title()))), Html.p(res.snippet())));
+        Stream.of(
+            Html.a(res.url(), true, Stream.of(Html.h3(res.title()))),
+            Html.a(res.url(), true, Stream.of(Html.span(StringEscapeUtils.escapeHtml4(res.url())))),
+            Html.p(res.snippet())));
   }
 }

@@ -129,6 +129,10 @@ public interface Html {
     return new Tag("div", elements);
   }
 
+  static Html span(String text) {
+    return new Tag("span", text);
+  }
+
   static Html a(String url, boolean openInNew, Stream<Html> elements) {
     return new Tag("a", Map.of("href", url, "target", openInNew ? "_blank" : "_self"), elements);
   }
