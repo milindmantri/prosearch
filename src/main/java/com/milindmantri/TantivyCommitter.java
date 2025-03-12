@@ -67,31 +67,13 @@ public class TantivyCommitter extends AbstractCommitter {
 
         final String title = lowerCaseProps.get("title").getFirst();
 
-        if (lowerCaseProps.containsKey("description")) {
-          maybeIndexedBytesLength =
-              client.indexAndLength(
-                  uri,
-                  title,
-                  inputStreamReader(upsertRequest.getContent()),
-                  lowerCaseProps.get("description").getFirst());
-        } else {
-          maybeIndexedBytesLength =
-              client.indexAndLength(uri, title, inputStreamReader(upsertRequest.getContent()));
-        }
+        maybeIndexedBytesLength =
+            client.indexAndLength(uri, title, inputStreamReader(upsertRequest.getContent()));
 
       } else {
 
-        if (lowerCaseProps.containsKey("description")) {
-          maybeIndexedBytesLength =
-              client.indexAndLengthNoTitleWithDescription(
-                  uri,
-                  inputStreamReader(upsertRequest.getContent()),
-                  lowerCaseProps.get("description").getFirst());
-        } else {
-
-          maybeIndexedBytesLength =
-              client.indexAndLength(uri, inputStreamReader(upsertRequest.getContent()));
-        }
+        maybeIndexedBytesLength =
+            client.indexAndLength(uri, inputStreamReader(upsertRequest.getContent()));
       }
 
       if (deleteResult && maybeIndexedBytesLength.isPresent()) {

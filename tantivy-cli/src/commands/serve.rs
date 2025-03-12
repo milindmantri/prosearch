@@ -90,8 +90,7 @@ impl IndexServer {
         // Don't search in urls unless specified
         let title_field = schema.get_field("title").unwrap();
         let body_field = schema.get_field("body").unwrap();
-        let desc_field = schema.get_field("desc").unwrap();
-        let search_fields = vec![title_field, body_field, desc_field];
+        let search_fields = vec![title_field, body_field];
 
         let mut query_parser =
             QueryParser::for_index(&index, search_fields);
@@ -101,11 +100,10 @@ impl IndexServer {
 
         // Default boost, if not set is 1.0
         // https://github.com/quickwit-oss/tantivy/blob/4aa8cd24707be1255599284f52eb6d388cf86ae8/src/query/query_parser/query_parser.rs#L687
-        query_parser.set_field_boost(title_field, 2.0);
+        query_parser.set_field_boost(title_field, 1.5);
 
         // One may miss the meta tag, after all it is metadata, but body should take higher priority
-        query_parser.set_field_boost(body_field, 1.5);
-        // description field by default has a boost of 1.0
+        query_parser.set_field_boost(body_field, 1.0);
 
         let reader = index.reader_builder()
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
@@ -150,34 +148,12 @@ impl IndexServer {
                 .iter()
                 .map(|(_, doc_address)| {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
-                    let desc_field = self.schema.get_field("desc").unwrap();
                     let body_field = self.schema.get_field("body").unwrap();
 
-                    // if description has terms, we use that as snippet
-                    let snippet : String = match doc.get_first(desc_field) {
-                        Some(owned_value) => match owned_value.into() {
-                            OwnedValue::Str(string) => {
-                                let desc_snip_gen =
-                                    SnippetGenerator::create(&searcher, &*query, desc_field)
-                                        .unwrap();
-
-                                let desc_snip = desc_snip_gen.snippet(&string);
-                                if desc_snip.is_empty() {
-                                    self.gen_html_snippet(&doc, &searcher, &*query, body_field)
-                                        .to_html()
-                                } else {
-                                    desc_snip.to_html()
-                                }
-                            },
-                            _ => {
-                                self.gen_html_snippet(&doc, &searcher, &*query, body_field)
-                                    .to_html()}
-                        },
-                        None => {
-                            self.gen_html_snippet(&doc, &searcher, &*query, body_field)
-                                .to_html()
-                        }
-                    };
+                    let snippet : String = 
+                        self
+                            .gen_html_snippet(&doc, &searcher, &*query, body_field)
+                            .to_html()
 
                     self.create_hit(doc, snippet)
                 })
@@ -231,14 +207,6 @@ impl IndexServer {
                     ),
                     Some(_) => {},
                 }
-            }
-
-            match obj.get_key_value::<String>(&"desc".to_string()) {
-                None => {},
-                Some(val) if !val.1.is_string() => return Some(
-                    InvalidArgument("\"desc\" field must have a string value.".to_string())
-                ),
-                Some(_) => {},
             }
         } else {
             return Some(

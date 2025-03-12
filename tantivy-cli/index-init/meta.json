@@ -19,19 +19,6 @@
       }
     },
     {
-      "name": "desc",
-      "type": "text",
-      "options": {
-        "indexing": {
-          "record": "freq",
-          "fieldnorms": true,
-          "tokenizer": "en_stem"
-        },
-        "stored": true,
-        "fast": false
-      }
-    },
-    {
       "name": "body",
       "type": "text",
       "options": {

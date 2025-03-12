@@ -260,7 +260,6 @@ class TantivyClientTest {
             {"url":"http://index-this-link.com"\
             ,"title":"My \\"Quoted\\" Title"\
             ,"body":"\\"Quoted\\" content to index"\
-            ,"desc":"Meta description"\
             }\
             """))
             .build();
@@ -275,8 +274,7 @@ class TantivyClientTest {
         tc.indexAndLength(
                 URI.create("http://index-this-link.com"),
                 "My \"Quoted\" Title",
-                "\"Quoted\" content to index",
-                "Meta description")
+                "\"Quoted\" content to index")
             .isPresent());
 
     Mockito.verify(httpClient, times(1))
