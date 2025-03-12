@@ -1,11 +1,17 @@
 package com.milindmantri;
 
+import com.norconex.collector.core.crawler.CrawlerEvent;
+import com.norconex.collector.core.doc.CrawlDocInfo;
+import com.norconex.collector.core.pipeline.DocInfoPipelineContext;
 import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
 import com.norconex.collector.http.HttpCollector;
 import com.norconex.collector.http.crawler.HttpCrawler;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
+import com.norconex.collector.http.doc.HttpDocInfo;
 import com.norconex.collector.http.pipeline.importer.HttpImporterPipeline;
 import com.norconex.collector.http.pipeline.importer.HttpImporterPipelineContext;
+import com.norconex.collector.http.pipeline.queue.HttpQueuePipeline;
+import com.norconex.collector.http.pipeline.queue.HttpQueuePipelineContext;
 import com.norconex.commons.lang.pipeline.IPipelineStage;
 import com.norconex.importer.response.ImporterResponse;
 import java.sql.SQLException;
@@ -15,6 +21,7 @@ public class ProCrawler extends HttpCrawler {
 
   private final Manager manager;
   private final HttpCrawlerConfig config;
+  private final IPipelineStage<DocInfoPipelineContext> countInitStage;
   private boolean isResuming;
   private boolean isRecrawl;
 
@@ -41,6 +48,15 @@ public class ProCrawler extends HttpCrawler {
 
     this.manager = manager;
     this.config = crawlerConfig;
+    this.countInitStage =
+        ctx -> {
+          this.manager.accept(
+              new CrawlerEvent.Builder(CrawlerEvent.DOCUMENT_QUEUED, this)
+                  .crawlDocInfo(ctx.getDocInfo())
+                  .build());
+
+          return true;
+        };
   }
 
   @Override
@@ -53,6 +69,24 @@ public class ProCrawler extends HttpCrawler {
         .execute(httpContext);
 
     return httpContext.getImporterResponse();
+  }
+
+  @Override
+  protected void executeQueuePipeline(final CrawlDocInfo crawlRef) {
+
+    HttpDocInfo httpData = (HttpDocInfo) crawlRef;
+    HttpQueuePipelineContext context = new HttpQueuePipelineContext(this, httpData);
+
+    var pipeline = new HttpQueuePipeline();
+    List<IPipelineStage<DocInfoPipelineContext>> existingStages =
+        pipeline.getStages().stream().toList();
+
+    pipeline.clearStages();
+
+    pipeline.addStage(this.countInitStage);
+    pipeline.addStages(existingStages);
+
+    pipeline.execute(context);
   }
 
   @Override

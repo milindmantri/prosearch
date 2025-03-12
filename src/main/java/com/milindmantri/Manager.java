@@ -21,11 +21,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.PrimitiveIterator;
 import java.util.SequencedSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -66,7 +66,7 @@ public class Manager
 
   private final int limit;
 
-  private final Map<Host, AtomicInteger> count = new ConcurrentHashMap<>();
+  private final ConcurrentMap<Host, AtomicInteger> count = new ConcurrentHashMap<>();
 
   private final DataSource dataSource;
   // TODO: make final
@@ -144,10 +144,7 @@ public class Manager
     if (event instanceof CrawlerEvent ce && ce.is(CrawlerEvent.DOCUMENT_QUEUED)) {
       // host has been queued, remove from not queued hosts if it exists there.
       Host host = new Host(URI.create(ce.getCrawlDocInfo().getReference()));
-
-      if (!isQueuedOnce(host)) {
-        count.put(host, new AtomicInteger(0));
-      }
+      this.count.putIfAbsent(host, new AtomicInteger(0));
     }
   }
 
