@@ -100,6 +100,9 @@ public final class CrawlerRunner implements Runnable {
         crawlerConfig.setReferenceFilters(manager);
         crawlerConfig.setEventListeners(manager);
         crawlerConfig.setMetadataFilters(manager);
+
+        crawlerConfig.setDocumentDeduplicate(true);
+
         crawlerConfig.setDelayResolver(manager.delayResolver());
 
         crawlerConfig.setCommitters(new TantivyCommitter(this.client, manager));
