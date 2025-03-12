@@ -153,7 +153,7 @@ impl IndexServer {
                     let snippet : String = 
                         self
                             .gen_html_snippet(&doc, &searcher, &*query, body_field)
-                            .to_html()
+                            .to_html();
 
                     self.create_hit(doc, snippet)
                 })
