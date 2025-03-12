@@ -7,9 +7,15 @@ import com.norconex.collector.http.link.impl.HtmlLinkExtractor;
 import com.norconex.collector.http.url.IURLNormalizer;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.unit.DataUnit;
+import com.norconex.commons.lang.xml.XML;
+import com.norconex.importer.ImporterConfig;
+import com.norconex.importer.handler.HandlerDoc;
+import com.norconex.importer.handler.transformer.AbstractStringTransformer;
+import com.norconex.importer.parser.ParseState;
 import java.net.URI;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 
@@ -84,6 +90,9 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setFetchHttpHead(true);
     crawlerConfig.setIgnoreSitemap(true);
 
+    var ic = getImporterConfig();
+    crawlerConfig.setImporterConfig(ic);
+
     try {
       var manager = new Manager(PER_HOST_CRAWLING_LIMIT, this.datasource, this.startUrls.stream());
       try (JdbcStoreEngine engine = new JdbcStoreEngine(manager)) {
@@ -119,5 +128,32 @@ public final class CrawlerRunner implements Runnable {
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private static ImporterConfig getImporterConfig() {
+    var reduceTransformer =
+        new AbstractStringTransformer() {
+          @Override
+          protected void transformStringContent(
+              final HandlerDoc doc,
+              final StringBuilder content,
+              final ParseState parseState,
+              final int sectionIndex) {
+            String text = content.toString();
+            content.setLength(0);
+            text = Pattern.compile("(\\s)+").matcher(text).replaceAll(" ");
+            content.append(text);
+          }
+
+          @Override
+          protected void saveStringTransformerToXML(final XML xml) {}
+
+          @Override
+          protected void loadStringTransformerFromXML(final XML xml) {}
+        };
+
+    var ic = new ImporterConfig();
+    ic.setPostParseHandlers(List.of(reduceTransformer));
+    return ic;
   }
 }
