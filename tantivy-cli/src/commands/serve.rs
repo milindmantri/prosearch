@@ -33,7 +33,7 @@ use tantivy::{
     collector::TopDocs,
     doc,
     query::{Query, QueryParser},
-    schema::{Field, NamedFieldDocument, OwnedValue, Schema, Term, *},
+    schema::{Field, NamedFieldDocument, OwnedValue, Schema, Term},
     snippet::{Snippet, SnippetGenerator},
     Document, Index, IndexReader, IndexWriter, ReloadPolicy, Searcher, TantivyDocument,
     TantivyError, TantivyError::InvalidArgument,
@@ -42,6 +42,218 @@ use urlencoded::UrlEncodedQuery;
 use bodyparser::Json;
 
 use crate::timer::TimerTree;
+
+// Hardcoded list of technologies and their keywords
+fn get_tech_keywords() -> HashMap<&'static str, Vec<&'static str>> {
+    let mut map = HashMap::new();
+    // AI generated keywords
+    map.insert("angular.io", vec!["angular", "components", "spa"]);
+    map.insert("api.drupal.org", vec!["drupal", "modules", "themes"]);
+    map.insert("api.haxe.org", vec!["haxe", "cross compile", "macro"]);
+    map.insert("api.qunitjs.com", vec!["qunit", "assertions", "test fixtures"]);
+    map.insert("babeljs.io", vec!["babel", "transpile", "presets"]);
+    map.insert("backbonejs.org", vec!["backbone", "events", "routers"]);
+    map.insert("bazel.build", vec!["bazel", "hermetic", "reproducible"]);
+    map.insert("bluebirdjs.com", vec!["bluebird", "promises", "coroutines"]);
+    map.insert("bower.io", vec!["bower", "frontend", "packages"]);
+    map.insert("cfdocs.org", vec!["cfml", "tags", "coldfusion"]);
+    map.insert("clojure.org", vec!["clojure", "persistent", "transducers"]);
+    map.insert("clojuredocs.org", vec!["clojure", "core async", "spec"]);
+    map.insert("codecept.io", vec!["codecept", "bdd", "helpers"]);
+    map.insert("codeception.com", vec!["codeception", "acceptance", "unit"]);
+    map.insert("codeigniter.com", vec!["codeigniter", "mvc", "active record"]);
+    map.insert("coffeescript.org", vec!["coffeescript", "indent", "literate"]);
+    map.insert("cran.r-project.org", vec!["r", "dataframes", "bioconductor"]);
+    map.insert("crystal-lang.org", vec!["crystal", "fibers", "macros"]);
+    map.insert("forum.crystal-lang.org", vec!["crystal", "shards", "concurrency"]);
+    map.insert("dart.dev", vec!["dart", "isolates", "mixins"]);
+    map.insert("dev.mysql.com", vec!["mysql", "innodb", "replication"]);
+    map.insert("developer.apple.com", vec!["apple", "swiftui", "metal"]);
+    map.insert("developer.mozilla.org", vec!["mdn", "web apis", "wasm"]);
+    map.insert("developer.wordpress.org", vec!["wordpress", "hooks", "gutenberg"]);
+    map.insert("doc.deno.land", vec!["deno", "permissions", "fresh"]);
+    map.insert("doc.rust-lang.org", vec!["rust", "borrowck", "macros"]);
+    map.insert("docs.astro.build", vec!["astro", "islands", "mdx"]);
+    map.insert("docs.aws.amazon.com", vec!["aws", "lambda", "s3"]);
+    map.insert("docs.brew.sh", vec!["brew", "formulae", "casks"]);
+    map.insert("docs.chef.io", vec!["chef", "cookbooks", "inspec"]);
+    map.insert("docs.cypress.io", vec!["cypress", "fixtures", "mocking"]);
+    map.insert("docs.influxdata.com", vec!["influxdb", "flux", "bucket"]);
+    map.insert("docs.julialang.org", vec!["julia", "multiple dispatch", "jupyter"]);
+    map.insert("docs.microsoft.com", vec!["microsoft", "dotnet", "azure"]);
+    map.insert("docs.npmjs.com", vec!["npm", "registry", "workspaces"]);
+    map.insert("docs.oracle.com", vec!["oracle", "plsql", "jdbc"]);
+    map.insert("docs.phalconphp.com", vec!["phalcon", "orm", "volt"]);
+    map.insert("docs.python.org", vec!["python", "decorators", "async"]);
+    map.insert("docs.rs", vec!["rust", "cargo", "no std"]);
+    map.insert("docs.ruby-lang.org", vec!["ruby", "gems", "blocks"]);
+    map.insert("docs.saltproject.io", vec!["salt", "states", "pillar"]);
+    map.insert("docs.wagtail.org", vec!["wagtail", "streamfield", "snippets"]);
+    map.insert("doctrine-project.org", vec!["doctrine", "dql", "migrations"]);
+    map.insert("docwiki.embarcadero.com", vec!["embarcadero", "vcl", "fmx"]);
+    map.insert("eigen.tuxfamily.org", vec!["eigen", "matrix", "numerical"]);
+    map.insert("elixir-lang.org", vec!["elixir", "otp", "ecto"]);
+    map.insert("elm-lang.org", vec!["elm", "elm architecture", "ports"]);
+    map.insert("en.cppreference.com", vec!["cpp", "stl", "concepts"]);
+    map.insert("enzymejs.github.io", vec!["enzyme", "shallow", "adapters"]);
+    map.insert("erights.org", vec!["e", "vat", "promises"]);
+    map.insert("erlang.org", vec!["erlang", "beam", "supervisors"]);
+    map.insert("esbuild.github.io", vec!["esbuild", "bundler", "tree shaking"]);
+    map.insert("eslint.org", vec!["eslint", "lint rules", "configs"]);
+    map.insert("expressjs.com", vec!["express", "middleware", "routing"]);
+    map.insert("fastapi.tiangolo.com", vec!["fastapi", "pydantic", "openapi"]);
+    map.insert("flow.org", vec!["flow", "type annotations", "linter"]);
+    map.insert("fortran90.org", vec!["fortran", "array", "mpi"]);
+    map.insert("fsharp.org", vec!["fsharp", "type providers", "async"]);
+    map.insert("getbootstrap.com", vec!["bootstrap", "grid", "responsive"]);
+    map.insert("getcomposer.org", vec!["composer", "autoload", "psr"]);
+    map.insert("git-scm.com", vec!["git", "rebase", "submodules"]);
+    map.insert("gnu.org", vec!["gnu", "gpl", "coreutils"]);
+    map.insert("gnucobol.sourceforge.io", vec!["cobol", "mainframe", "legacy"]);
+    map.insert("go.dev", vec!["go", "goroutines", "garbage"]);
+    map.insert("golang.org", vec!["go", "channels", "interfaces"]);
+    map.insert("graphite.readthedocs.io", vec!["graphite", "carbon", "whisper"]);
+    map.insert("groovy-lang.org", vec!["groovy", "grails", "spock"]);
+    map.insert("gruntjs.com", vec!["grunt", "plugins", "tasks"]);
+    map.insert("handlebarsjs.com", vec!["handlebars", "partials", "helpers"]);
+    map.insert("haskell.org", vec!["haskell", "monads", "ghc"]);
+    map.insert("hex.pm", vec!["hex", "mix", "exunit"]);
+    map.insert("hexdocs.pm", vec!["hex", "ex doc", "docs"]);
+    map.insert("httpd.apache.org", vec!["apache", "mod ssl", "htaccess"]);
+    map.insert("i3wm.org", vec!["i3", "tiling", "workspaces"]);
+    map.insert("jasmine.github.io", vec!["jasmine", "matchers", "spies"]);
+    map.insert("javascript.info", vec!["javascript", "event loop", "prototype"]);
+    map.insert("jekyllrb.com", vec!["jekyll", "liquid", "front matter"]);
+    map.insert("jsdoc.app", vec!["jsdoc", "typedef", "tags"]);
+    map.insert("julialang.org", vec!["julia", "julia vscode", "revise"]);
+    map.insert("knockoutjs.com", vec!["knockout", "observables", "bindings"]);
+    map.insert("kotlinlang.org", vec!["kotlin", "coroutines", "dsls"]);
+    map.insert("laravel.com", vec!["laravel", "eloquent", "artisan"]);
+    map.insert("latexref.xyz", vec!["latex", "bibtex", "packages"]);
+    map.insert("learn.microsoft.com", vec!["microsoft", "powershell", "azure"]);
+    map.insert("lesscss.org", vec!["less", "mixins", "variables"]);
+    map.insert("love2d.org", vec!["love2d", "canvas", "physics"]);
+    map.insert("lua.org", vec!["lua", "metatables", "coroutine"]);
+    map.insert("man7.org", vec!["linux", "syscalls", "proc"]);
+    map.insert("mariadb.com", vec!["mariadb", "galera", "columns"]);
+    map.insert("mochajs.org", vec!["mocha", "bdd", "reporters"]);
+    map.insert("modernizr.com", vec!["modernizr", "polyfills", "feature"]);
+    map.insert("momentjs.com", vec!["moment", "timezone", "duration"]);
+    map.insert("mongoosejs.com", vec!["mongoose", "schemas", "populate"]);
+    map.insert("next.router.vuejs.org", vec!["vue", "navigation guards", "dynamic"]);
+    map.insert("next.vuex.vuejs.org", vec!["vuex", "mutations", "modules"]);
+    map.insert("nginx.org", vec!["nginx", "reverse proxy", "load"]);
+    map.insert("nim-lang.org", vec!["nim", "metaprogramming", "gc"]);
+    map.insert("nixos.org", vec!["nixos", "derivations", "channels"]);
+    map.insert("nodejs.org", vec!["nodejs", "npm", "event loop"]);
+    map.insert("npmjs.com", vec!["npm", "dependencies", "semver"]);
+    map.insert("ocaml.org", vec!["ocaml", "opam", "functors"]);
+    map.insert("odin-lang.org", vec!["odin", "procedural", "llvm"]);
+    map.insert("openjdk.java.net", vec!["openjdk", "hotspot", "jmh"]);
+    map.insert("opentsdb.net", vec!["opentsdb", "metrics", "put"]);
+    map.insert("perldoc.perl.org", vec!["perl", "cpan", "regex"]);
+    map.insert("php.net", vec!["php", "composer", "namespaces"]);
+    map.insert("playwright.dev", vec!["playwright", "browsers", "fixtures"]);
+    map.insert("pointclouds.org", vec!["pcl", "point cloud", "registration"]);
+    map.insert("postgresql.org", vec!["postgresql", "postgis", "jsonb"]);
+    map.insert("prettier.io", vec!["prettier", "format", "config"]);
+    map.insert("pugjs.org", vec!["pug", "mixins", "filters"]);
+    map.insert("pydata.org", vec!["pydata", "numpy", "pandas"]);
+    map.insert("pytorch.org", vec!["pytorch", "tensors", "autograd"]);
+    map.insert("qt.io", vec!["qt", "qml", "signals"]);
+    map.insert("r-project.org", vec!["r", "tidyverse", "ggplot"]);
+    map.insert("react-bootstrap.github.io", vec!["react", "components", "hooks"]);
+    map.insert("reactivex.io", vec!["rxjs", "observables", "operators"]);
+    map.insert("reactjs.org", vec!["react", "jsx", "context"]);
+    map.insert("reactnative.dev", vec!["react", "native", "bridge"]);
+    map.insert("reactrouterdotcom.fly.dev", vec!["react", "history", "link"]);
+    map.insert("readthedocs.io", vec!["readthedocs", "sphinx", "rtd"]);
+    map.insert("readthedocs.org", vec!["readthedocs", "versions", "search"]);
+    map.insert("redis.io", vec!["redis", "pubsub", "lua"]);
+    map.insert("redux.js.org", vec!["redux", "reducers", "middleware"]);
+    map.insert("requirejs.org", vec!["requirejs", "amd", "optimizer"]);
+    map.insert("rethinkdb.com", vec!["rethinkdb", "changefeeds", "joins"]);
+    map.insert("ruby-doc.org", vec!["ruby", "yard", "ri"]);
+    map.insert("ruby-lang.org", vec!["ruby", "rake", "erb"]);
+    map.insert("rust-lang.org", vec!["rust", "ownership", "traits"]);
+    map.insert("rxjs.dev", vec!["rxjs", "subjects", "schedulers"]);
+    map.insert("sass-lang.com", vec!["sass", "scss", "mixins"]);
+    map.insert("scala-lang.org", vec!["scala", "akka", "cats"]);
+    map.insert("scikit-image.org", vec!["scikit", "image", "ndimage"]);
+    map.insert("scikit-learn.org", vec!["scikit", "svm", "pipeline"]);
+    map.insert("spring.io", vec!["spring", "boot", "dependency"]);
+    map.insert("sqlite.org", vec!["sqlite", "sql", "fts"]);
+    map.insert("stdlib.ponylang.io", vec!["pony", "capabilities", "actors"]);
+    map.insert("superuser.com", vec!["superuser", "answers", "moderators"]);
+    map.insert("svelte.dev", vec!["svelte", "stores", "actions"]);
+    map.insert("swift.org", vec!["swift", "swiftui", "codable"]);
+    map.insert("tailwindcss.com", vec!["tailwind", "utility", "purge"]);
+    map.insert("twig.symfony.com", vec!["twig", "filters", "inheritance"]);
+    map.insert("typescriptlang.org", vec!["typescript", "types", "generics"]);
+    map.insert("underscorejs.org", vec!["underscore", "collections", "chaining"]);
+    map.insert("vitejs.dev", vec!["vite", "hmr", "plugins"]);
+    map.insert("vitest.dev", vec!["vitest", "coverage", "snapshot"]);
+    map.insert("vuejs.org", vec!["vue", "composition", "directives"]);
+    map.insert("vueuse.org", vec!["vueuse", "composables", "sensors"]);
+    map.insert("webpack.js.org", vec!["webpack", "loaders", "chunks"]);
+    map.insert("wiki.archlinux.org", vec!["arch", "pacman", "aur"]);
+    map.insert("www.chaijs.com", vec!["chai", "assert", "should"]);
+    map.insert("www.electronjs.org", vec!["electron", "ipc", "asar"]);
+    map.insert("www.gnu.org", vec!["gnu", "gcc", "bash"]);
+    map.insert("www.hammerspoon.org", vec!["hammerspoon", "lua", "automation"]);
+    map.insert("www.khronos.org", vec!["khronos", "vulkan", "spirv"]);
+    map.insert("www.lua.org", vec!["lua", "luajit", "metatable"]);
+    map.insert("www.php.net/manual/en/", vec!["php", "phpdoc", "extensions"]);
+    map.insert("www.pygame.org", vec!["pygame", "sprite", "surface"]);
+    map.insert("www.rubydoc.info", vec!["ruby", "yardoc", "rdoc"]);
+    map.insert("www.statsmodels.org", vec!["statsmodels", "regression", "timeseries"]);
+    map.insert("www.tcl.tk", vec!["tcl", "tk", "expect"]);
+    map.insert("www.terraform.io", vec!["terraform", "providers", "state"]);
+    map.insert("www.vagrantup.com", vec!["vagrant", "boxes", "provisioners"]);
+    map.insert("www.yiiframework.com", vec!["yii", "gii", "activerecord"]);
+    map.insert("yarnpkg.com", vec!["yarn", "berry", "workspaces"]);
+    map
+}
+
+// Search warmer
+struct SearchWarmer {
+    tech_keywords: HashMap<&'static str, Vec<&'static str>>,
+}
+
+impl SearchWarmer {
+    fn new() -> Self {
+        SearchWarmer {
+            tech_keywords: get_tech_keywords(),
+        }
+    }
+
+    fn warm(&self, query_parser: &QueryParser, searcher: &Searcher) -> Result<(), TantivyError> {
+
+        for (_site, keywords) in self.tech_keywords.iter() {
+
+            if !keywords.is_empty() {
+
+                let query = query_parser.parse_query(&format!("{}", keywords[0]))?;
+                let _ = searcher.search(
+                    &query,
+                    &tantivy::collector::TopDocs::with_limit(2)
+                )?;
+
+                let query2 = query_parser.parse_query(&format!("{} {}", keywords[0], keywords[1]))?;
+                let _ = searcher.search(
+                    &query2,
+                    &tantivy::collector::TopDocs::with_limit(2)
+                );
+
+                let _ = searcher.search(
+                    &query_parser.parse_query(&format!("{} {}", keywords[0], keywords[2]))?,
+                    &tantivy::collector::TopDocs::with_limit(2)
+                );
+            }
+        }
+        Ok(())
+    }
+}
 
 pub fn run_serve_cli(matches: &ArgMatches) -> Result<(), String> {
     let index_directory = PathBuf::from(matches.get_one::<String>("index").unwrap());
@@ -134,6 +346,10 @@ impl IndexServer {
         let reader = index.reader_builder()
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()?;
+
+        let warmer = SearchWarmer::new();
+        warmer.warm(&query_parser, &reader.searcher())?;
+
         let writer : IndexWriter = index.writer(50_000_000)?;
         Ok(IndexServer {
             reader,
