@@ -15,42 +15,33 @@
 
 /// Ref: https://github.com/quickwit-oss/tantivy/blob/main/examples/snippet.rs
 
-use crate::timer::TimerTree;
 use clap::ArgMatches;
-use iron::mime::Mime;
-use iron::prelude::*;
-use iron::status;
-use iron::typemap::Key;
+use iron::{mime::Mime, prelude::*, status, typemap::Key};
 use mount::Mount;
 use persistent::Write;
 use serde_derive::Serialize;
-use std::convert::From;
-use std::error::Error;
-use std::fmt::{self, Debug};
-use std::path::Path;
-use std::path::PathBuf;
-use std::str::FromStr;
-use tantivy::query::Query;
-use tantivy::Searcher;
-use tantivy::collector::{TopDocs};
-use tantivy::query::QueryParser;
-use tantivy::schema::NamedFieldDocument;
-use tantivy::schema::Schema;
-use tantivy::schema::Term;
-use tantivy::schema::OwnedValue;
-use tantivy::Document;
-use tantivy::Index;
-use tantivy::{IndexReader, IndexWriter};
-use tantivy::TantivyDocument;
-use tantivy::TantivyError::InvalidArgument;
-use tantivy::snippet::{SnippetGenerator};
-use tantivy::snippet::Snippet;
-use tantivy::schema::Field;
-use tantivy::ReloadPolicy;
+use serde_json::{Map, Value};
+use std::{
+    collections::HashMap,
+    convert::From,
+    error::Error,
+    fmt::{self, Debug},
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+use tantivy::{
+    collector::TopDocs,
+    doc,
+    query::{Query, QueryParser},
+    schema::{Field, NamedFieldDocument, OwnedValue, Schema, Term, *},
+    snippet::{Snippet, SnippetGenerator},
+    Document, Index, IndexReader, IndexWriter, ReloadPolicy, Searcher, TantivyDocument,
+    TantivyError, TantivyError::InvalidArgument,
+};
 use urlencoded::UrlEncodedQuery;
 use bodyparser::Json;
-use serde_json::Map;
-use serde_json::Value;
+
+use crate::timer::TimerTree;
 
 pub fn run_serve_cli(matches: &ArgMatches) -> Result<(), String> {
     let index_directory = PathBuf::from(matches.get_one::<String>("index").unwrap());
