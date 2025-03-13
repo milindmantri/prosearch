@@ -61,6 +61,41 @@ pub fn run_serve_cli(matches: &ArgMatches) -> Result<(), String> {
     run_serve(index_directory, &host).map_err(|e| format!("{:?}", e))
 }
 
+// quotifying each term allows you
+// derived after observing the query AST
+fn escape_tantivy_query(input: &str) -> String {
+    input.split_whitespace() // Split into terms by whitespace
+        .map(|term| {
+
+            // Escape special characters in the term
+            let mut escaped = String::new();
+            for c in term.chars() {
+                match c {
+                    '\\' | '"' | '\'' => {
+                        println!("{}", c);
+                        escaped.push('\\');
+                        escaped.push(c);
+                        println!("{}", escaped)
+                    }
+                    _ => {
+                        escaped.push(c);
+                    },
+                }
+            }
+
+            escaped
+        })
+        .map(|esc| {
+            let mut f = String::new();
+            f.push_str("\"");
+            f.push_str(&esc);
+            f.push_str("\"");
+            f
+        })
+        .collect::<Vec<_>>()
+        .join(" ") // Rejoin terms with spaces
+}
+
 #[derive(Serialize)]
 struct Serp {
     q: String,
@@ -127,11 +162,9 @@ impl IndexServer {
     }
 
     fn search(&self, q: String, num_hits: usize, _offset: usize) -> tantivy::Result<Serp> {
-        let query = self
+        let (query, _err) = self
             .query_parser
-            .parse_query(&q)
-            .expect("Parsing the query failed");
-        // TODO: Maybe use parse_query_lenient when parsing fails?
+            .parse_query_lenient(&escape_tantivy_query(&q));
 
         let searcher = self.reader.searcher();
         let mut timer_tree = TimerTree::default();
@@ -412,3 +445,90 @@ fn run_serve(directory: PathBuf, host: &str) -> tantivy::Result<()> {
 }
 
 // TODO: Add tests
+
+// AI + dev
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_reserved_keywords() {
+        // Exact reserved keywords should be quoted
+        assert_eq!(escape_tantivy_query("AND"), "\"AND\"");
+        assert_eq!(escape_tantivy_query("OR"), "\"OR\"");
+        assert_eq!(escape_tantivy_query("IN"), "\"IN\"");
+    }
+
+    #[test]
+    fn test_partial_keywords() {
+        // Substrings/partial matches should not be quoted
+        assert_eq!(escape_tantivy_query("ANDROID"), "\"ANDROID\"");
+        assert_eq!(escape_tantivy_query("ORACLE"), "\"ORACLE\"");
+        assert_eq!(escape_tantivy_query("INPUT"), "\"INPUT\"");
+    }
+
+    fn test_case_sensitivity() {
+        // Case-sensitive matching (only uppercase is reserved)
+        assert_eq!(escape_tantivy_query("and"), "and");
+        assert_eq!(escape_tantivy_query("or"), "or");
+        assert_eq!(escape_tantivy_query("in"), "in");
+    }
+
+    #[test]
+    fn test_keywords_with_special_chars() {
+        // Keywords with special characters should be escaped and quoted
+        assert_eq!(escape_tantivy_query("+AND"), "\"+AND\"");
+        assert_eq!(escape_tantivy_query("OR~"), "\"OR~\"");
+        assert_eq!(escape_tantivy_query("IN*"), "\"IN*\"");
+    }
+
+    #[test]
+    fn test_mixed_keyword_usage() {
+        // Mixed keyword-like terms
+        assert_eq!(escape_tantivy_query("AND=OR"), "\"AND=OR\"");
+        assert_eq!(escape_tantivy_query("IN/OUT"), "\"IN/OUT\"");
+    }
+
+    #[test]
+    fn test_mixed_keyword_usage_1() {
+        // Mixed keyword-like terms
+        assert_eq!(escape_tantivy_query("a AND b"), "\"a\" \"AND\" \"b\"");
+    }
+
+    #[test]
+    fn test_quoted_keywords() {
+        assert_eq!(escape_tantivy_query("a \"AND\" b"), "\"a\" \"\\\"AND\\\"\" \"b\"");
+
+        // user says: a \"AND\" b
+        // pass to tantivy: "a" "\\\"AND\\\"" "b"
+        assert_eq!(escape_tantivy_query("a \\\"AND\\\" b"), "\"a\" \"\\\\\\\"AND\\\\\\\"\" \"b\"");
+
+        assert_eq!(escape_tantivy_query("'OR'"), "\"\\\'OR\\\'\"");
+    }
+
+    #[test]
+    fn test_field_specific_queries() {
+        // Colon-containing terms should be escaped
+        assert_eq!(
+            escape_tantivy_query("field:AND"),
+            "\"field:AND\""
+        );
+        assert_eq!(
+            escape_tantivy_query("tags:IN"),
+            "\"tags:IN\""
+        );
+    }
+
+    #[test]
+    fn test_boolean_combinations() {
+        // Boolean-like combinations in terms
+        assert_eq!(
+            escape_tantivy_query("ANDOR"),
+            "\"ANDOR\""
+        );
+        assert_eq!(
+            escape_tantivy_query("NOTIN"),
+            "\"NOTIN\""
+        );
+    }
+}
