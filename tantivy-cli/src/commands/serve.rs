@@ -35,6 +35,7 @@ use tantivy::{
     query::{Query, QueryParser},
     schema::{Field, NamedFieldDocument, OwnedValue, Schema, Term},
     snippet::{Snippet, SnippetGenerator},
+    tokenizer::{TextAnalyzer, LowerCaser, WhitespaceTokenizer},
     Document, Index, IndexReader, IndexWriter, ReloadPolicy, Searcher, TantivyDocument,
     TantivyError, TantivyError::InvalidArgument,
 };
@@ -322,6 +323,13 @@ struct IndexServer {
 impl IndexServer {
     fn load(path: &Path) -> tantivy::Result<IndexServer> {
         let index = Index::open_in_dir(path)?;
+
+        let white_lowercaser = TextAnalyzer::builder(WhitespaceTokenizer::default())
+            .filter(LowerCaser)
+            .build();
+
+        index.tokenizers().register("white-lowercaser", white_lowercaser);
+
         let schema = index.schema();
 
         // Improve searching and ranking,

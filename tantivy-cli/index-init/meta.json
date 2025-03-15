@@ -12,7 +12,7 @@
         "indexing": {
           "record": "basic",
           "fieldnorms": true,
-          "tokenizer": "whitespace"
+          "tokenizer": "white-lowercaser"
         },
         "stored": true,
         "fast": false
@@ -25,7 +25,7 @@
         "indexing": {
           "record": "position",
           "fieldnorms": true,
-          "tokenizer": "whitespace"
+          "tokenizer": "white-lowercaser"
         },
         "stored": true,
         "fast": false
