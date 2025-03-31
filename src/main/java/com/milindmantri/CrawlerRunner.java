@@ -85,7 +85,6 @@ public final class CrawlerRunner implements Runnable {
     urlCrawlScope.setIncludeSubdomains(false);
     crawlerConfig.setUrlCrawlScopeStrategy(urlCrawlScope);
 
-    crawlerConfig.setIgnoreCanonicalLinks(true);
     crawlerConfig.setFetchHttpHead(true);
     crawlerConfig.setIgnoreSitemap(true);
 
