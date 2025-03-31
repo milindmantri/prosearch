@@ -75,8 +75,7 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setStartURLs(this.startUrls.stream().map(URI::toString).toList());
 
-    //    crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
-    crawlerConfig.setNumThreads(1);
+    crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
 
     crawlerConfig.setId(System.getProperty("crawler-id", "crwlr"));
 
