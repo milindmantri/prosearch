@@ -86,7 +86,7 @@ public final class CrawlerRunner implements Runnable {
     crawlerConfig.setUrlCrawlScopeStrategy(urlCrawlScope);
 
     crawlerConfig.setFetchHttpHead(true);
-    crawlerConfig.setIgnoreSitemap(true);
+    crawlerConfig.setIgnoreSitemap(false);
 
     var ic = getImporterConfig();
     crawlerConfig.setImporterConfig(ic);
