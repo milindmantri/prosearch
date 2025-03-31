@@ -87,6 +87,7 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setFetchHttpHead(true);
     crawlerConfig.setIgnoreSitemap(false);
+    crawlerConfig.setStartURLsAsync(true);
 
     var ic = getImporterConfig();
     crawlerConfig.setImporterConfig(ic);
