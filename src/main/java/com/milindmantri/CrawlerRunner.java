@@ -29,9 +29,13 @@ public final class CrawlerRunner implements Runnable {
   private final DataSource datasource;
   private final TantivyClient client;
   private final List<URI> startUrls;
+  private final SemaphoredExecutor executor;
 
   public CrawlerRunner(
-      final DataSource datasource, final TantivyClient client, final Stream<URI> startUrls) {
+      final DataSource datasource,
+      final TantivyClient client,
+      final Stream<URI> startUrls,
+      final SemaphoredExecutor executor) {
     if (datasource == null) {
       throw new IllegalArgumentException("datasource must not be null.");
     }
@@ -44,9 +48,14 @@ public final class CrawlerRunner implements Runnable {
       throw new IllegalArgumentException("startUrls must not be null.");
     }
 
+    if (executor == null) {
+      throw new IllegalArgumentException("executor must not be null.");
+    }
+
     this.client = client;
     this.datasource = datasource;
     this.startUrls = startUrls.toList();
+    this.executor = executor;
   }
 
   @Override
@@ -75,7 +84,8 @@ public final class CrawlerRunner implements Runnable {
 
     crawlerConfig.setStartURLs(this.startUrls.stream().map(URI::toString).toList());
 
-    crawlerConfig.setNumThreads(Runtime.getRuntime().availableProcessors() * 2);
+    final int threads = Runtime.getRuntime().availableProcessors() * 2;
+    crawlerConfig.setNumThreads(threads);
 
     crawlerConfig.setId(System.getProperty("crawler-id", "crwlr"));
 
@@ -108,6 +118,8 @@ public final class CrawlerRunner implements Runnable {
         crawlerConfig.setReferenceFilters(manager);
         crawlerConfig.setMetadataFilters(manager);
 
+        crawlerConfig.setSitemapResolver(new ModifiedGenericSitemapResolver(executor));
+
         crawlerConfig.setDocumentDeduplicate(true);
 
         crawlerConfig.setDelayResolver(manager.delayResolver());
@@ -116,7 +128,7 @@ public final class CrawlerRunner implements Runnable {
 
         config.setCrawlerConfigs(crawlerConfig);
 
-        ProCollector spider = new ProCollector(config, manager);
+        ProCollector spider = new ProCollector(config, manager, executor);
 
         if (Boolean.parseBoolean(System.getProperty("clean-crawler-data", "false"))) {
           spider.clean();

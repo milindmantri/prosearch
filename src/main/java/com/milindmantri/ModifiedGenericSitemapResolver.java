@@ -34,8 +34,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
 import javax.xml.stream.XMLStreamException;
@@ -82,12 +80,10 @@ public class ModifiedGenericSitemapResolver extends CrawlerLifeCycleListener
   private boolean lenient;
   private boolean stopping;
   private final List<String> sitemapPaths = new ArrayList<>(DEFAULT_SITEMAP_PATHS);
-  private final ExecutorService executor;
-  private final Semaphore childSitemapSem;
+  private final SemaphoredExecutor executor;
 
-  public ModifiedGenericSitemapResolver(final ExecutorService executor, final Semaphore sem) {
+  public ModifiedGenericSitemapResolver(final SemaphoredExecutor executor) {
     this.executor = executor;
-    this.childSitemapSem = sem;
   }
 
   @Override
@@ -377,15 +373,8 @@ public class ModifiedGenericSitemapResolver extends CrawlerLifeCycleListener
         if (StringUtils.isNotBlank(url)) {
           executor.submit(
               () -> {
-                try {
-                  this.childSitemapSem.acquire();
-                  resolveSitemap(url, fetcher, sitemapURLConsumer, resolvedLocations);
-                } catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
-                  throw new RuntimeException(e);
-                } finally {
-                  this.childSitemapSem.release();
-                }
+                resolveSitemap(url, fetcher, sitemapURLConsumer, resolvedLocations);
+                return true;
               });
         }
       } else if ("url".equalsIgnoreCase(c.getLocalName())) {

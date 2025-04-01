@@ -1,6 +1,7 @@
 package com.milindmantri;
 
 import com.norconex.collector.core.doc.CrawlDocInfo;
+import com.norconex.collector.core.monitor.MdcUtil;
 import com.norconex.collector.core.pipeline.DocInfoPipelineContext;
 import com.norconex.collector.core.pipeline.importer.ImporterPipelineContext;
 import com.norconex.collector.http.HttpCollector;
@@ -16,14 +17,23 @@ import com.norconex.importer.response.ImporterResponse;
 import java.net.URI;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.StructuredTaskScope;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ProCrawler extends HttpCrawler {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProCrawler.class);
+
   private final Manager manager;
   private final HttpCrawlerConfig config;
+  private final SemaphoredExecutor exec;
   private final IPipelineStage<DocInfoPipelineContext> countInitStage;
   private boolean isResuming;
   private boolean isRecrawl;
+  private boolean isFastQueueInit;
 
   private static class ImporterQueueRejectPipeline extends HttpImporterPipeline {
 
@@ -43,10 +53,14 @@ public class ProCrawler extends HttpCrawler {
   }
 
   public ProCrawler(
-      final HttpCrawlerConfig crawlerConfig, final HttpCollector collector, final Manager manager) {
+      final HttpCrawlerConfig crawlerConfig,
+      final HttpCollector collector,
+      final Manager manager,
+      final SemaphoredExecutor exec) {
     super(crawlerConfig, collector);
 
     this.manager = manager;
+    this.exec = exec;
     this.config = crawlerConfig;
     this.countInitStage =
         ctx -> this.manager.initCount(new Host(URI.create(ctx.getDocInfo().getReference())));
@@ -95,7 +109,17 @@ public class ProCrawler extends HttpCrawler {
       this.isRecrawl = true;
     }
 
-    super.beforeCrawlerExecution(resume);
+    // take the queueing start urls mechanism in our hands, passing true never runs the queuing
+    // work, but still inits the other essentials.
+    super.beforeCrawlerExecution(true);
+
+    if (!resume) {
+      crawlStartUrlsAndSitemapFast(new FastQueuePipeline(exec));
+    }
+
+    this.isFastQueueInit = true;
+
+    LOGGER.info("Crawling start URLs is complete.");
 
     // initial queue is not set correctly if the crawler fails when doing initial crawl
     // TODO: Improve by finding diff-ed start URLs and initiating a crawl on them
@@ -113,6 +137,36 @@ public class ProCrawler extends HttpCrawler {
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * This crawls all start URLs concurrently which in turn calls the fast queue pipeline, enabling
+   * faster initialization of the queue allowing crawling to begin sooner.
+   */
+  private void crawlStartUrlsAndSitemapFast(final FastQueuePipeline fast) {
+    List<String> startURLs = getCrawlerConfig().getStartURLs();
+    MdcUtil.setCrawlerId(getId());
+    Thread.currentThread().setName(getId());
+
+    try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+
+      startURLs.stream()
+          .filter(StringUtils::isNotBlank)
+          .map(s -> new HttpQueuePipelineContext(this, new HttpDocInfo(s, 0)))
+          .map(fast::queueStartUrl)
+          .<Callable<?>>map(f -> (f::get))
+          .forEach(scope::fork);
+
+      scope.join();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  protected boolean isQueueInitialized() {
+    return this.isFastQueueInit;
   }
 
   public boolean isRecrawling() {

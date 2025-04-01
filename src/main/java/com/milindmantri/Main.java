@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -35,7 +36,8 @@ public class Main {
 
     ClassLoader classloader = Thread.currentThread().getContextClassLoader();
     try (var dataSource = new HikariDataSource(new HikariConfig(dbProps().toProperties()));
-        ScheduledExecutorService crawlerScheduler = Executors.newSingleThreadScheduledExecutor()) {
+        ScheduledExecutorService crawlerScheduler = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService virtualThreads = Executors.newVirtualThreadPerTaskExecutor()) {
 
       Set<URI> startUrls;
       try (InputStream is = classloader.getResourceAsStream("start-urls");
@@ -59,16 +61,19 @@ public class Main {
                   .build(),
               URI.create(System.getProperty("tantivy-server", "http://localhost:3000")));
 
+      SemaphoredExecutor exec =
+          new SemaphoredExecutor(virtualThreads, Runtime.getRuntime().availableProcessors() * 2);
       Future<?> crawlerFuture =
           crawlerScheduler.scheduleWithFixedDelay(
-              new CrawlerRunner(dataSource, client, startUrls.stream()),
+              new CrawlerRunner(dataSource, client, startUrls.stream(), exec),
               0,
               delayBetweenRuns,
               TimeUnit.HOURS);
 
       int httpPort = Integer.parseInt(System.getProperty("http-server-port", "80"));
 
-      HttpServer httpServer = httpServer(httpPort, client, dataSource, startUrls.stream());
+      HttpServer httpServer =
+          httpServer(httpPort, client, dataSource, startUrls.stream(), virtualThreads);
 
       httpServer.start();
 
@@ -84,10 +89,11 @@ public class Main {
       final int port,
       final TantivyClient tantivyClient,
       final DataSource datasource,
-      final Stream<URI> startUrls)
+      final Stream<URI> startUrls,
+      final ExecutorService virtualThreads)
       throws IOException {
     HttpServer httpServer = HttpServer.create(new InetSocketAddress(port), 0);
-    httpServer.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+    httpServer.setExecutor(virtualThreads);
 
     httpServer.createContext("/search/", new SearchHttpHandler(tantivyClient));
     httpServer.createContext(

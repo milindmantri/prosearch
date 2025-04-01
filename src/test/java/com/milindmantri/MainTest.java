@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -53,7 +54,8 @@ class MainTest {
     TantivyClient tantivy = Mockito.mock(TantivyClient.class);
     Mockito.when(tantivy.search("hello")).thenReturn(SAMPLE_RESPONSE_OBJ);
 
-    HttpServer httpServer = Main.httpServer(0, tantivy, datasource, Stream.of());
+    HttpServer httpServer =
+        Main.httpServer(0, tantivy, datasource, Stream.of(), Executors.newSingleThreadExecutor());
     httpServer.start();
     HttpClient client = HttpClient.newHttpClient();
     HttpResponse<String> res =
@@ -78,7 +80,8 @@ class MainTest {
     Mockito.when(tantivy.search("hello"))
         .thenThrow(new TantivyClient.FailedSearchException("search-err"));
 
-    HttpServer httpServer = Main.httpServer(0, tantivy, datasource, Stream.of());
+    HttpServer httpServer =
+        Main.httpServer(0, tantivy, datasource, Stream.of(), Executors.newSingleThreadExecutor());
     httpServer.start();
     HttpClient client = HttpClient.newHttpClient();
     HttpResponse<String> res =
