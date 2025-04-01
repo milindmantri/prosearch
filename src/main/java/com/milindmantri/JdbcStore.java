@@ -168,32 +168,16 @@ public class JdbcStore<T> implements IDataStore<T> {
   public Optional<T> deleteFirst() {
 
     if (isQueued()) {
-      final Optional<Host> next = this.manager.getNextHost();
-      if (next.isPresent() && !this.missedDeletes.contains(next.get())) {
+      Optional<Optional<T>> ret =
+          this.manager
+              .nextHost()
+              .filter(h -> !this.missedDeletes.contains(h))
+              .map(this::findOrMiss)
+              .filter(Optional::isPresent)
+              .findFirst();
 
-        final String sql = "SELECT id, json FROM <table> WHERE host = ? ORDER BY modified LIMIT 1";
-
-        try (Connection conn = engine.getConnection();
-            PreparedStatement stmt =
-                conn.prepareStatement(
-                    sql.replace("<table>", tableName),
-                    // Requires scrollable type but wasn't set in original store
-                    ResultSet.TYPE_SCROLL_INSENSITIVE,
-                    CONCUR_UPDATABLE)) {
-
-          stmt.setString(1, next.get().toString());
-
-          var rec = firstRecord(stmt.executeQuery());
-          if (!rec.isEmpty()) {
-            delete(rec.id);
-            return rec.object;
-          } else {
-            this.missedDeletes.add(next.get());
-          }
-
-        } catch (SQLException e) {
-          throw new RuntimeException(e);
-        }
+      if (ret.isPresent()) {
+        return ret.get();
       }
     }
 
@@ -212,6 +196,33 @@ public class JdbcStore<T> implements IDataStore<T> {
       }
     }
     return rec.object;
+  }
+
+  private Optional<T> findOrMiss(final Host host) {
+    final String sql = "SELECT id, json FROM <table> WHERE host = ? ORDER BY modified LIMIT 1";
+
+    try (Connection conn = engine.getConnection();
+        PreparedStatement stmt =
+            conn.prepareStatement(
+                sql.replace("<table>", tableName),
+                // Requires scrollable type but wasn't set in original store
+                ResultSet.TYPE_SCROLL_INSENSITIVE,
+                CONCUR_UPDATABLE)) {
+
+      stmt.setString(1, host.toString());
+
+      var rec = firstRecord(stmt.executeQuery());
+      if (!rec.isEmpty()) {
+        delete(rec.id);
+        return rec.object;
+      } else {
+        this.missedDeletes.add(host);
+        return Optional.empty();
+      }
+
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

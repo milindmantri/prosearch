@@ -16,6 +16,9 @@ import com.norconex.commons.lang.text.TextMatcher;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -104,6 +107,9 @@ public class Manager
     this.startUrlsSet =
         startUrls.map(Host::new).collect(Collectors.toCollection(LinkedHashSet::new));
     this.startUrls = this.startUrlsSet.toArray(Host[]::new);
+
+    Arrays.stream(this.startUrls).forEach(this::initCount);
+
     // infinite stream over index
     this.nextHostIndex = IntStream.iterate(0, i -> (i + 1) % this.startUrls.length).iterator();
   }
@@ -343,29 +349,38 @@ public class Manager
   }
 
   /** Helper to get next host to pull entry from queue */
-  public Optional<Host> getNextHost() {
+  Optional<Host> getNextHost() {
+    return this.nextHost().findFirst();
+  }
+
+  public Stream<Host> nextHost() {
 
     if (this.nextHostIndex.hasNext()) {
-
-      Host host = null;
-      int firstIndex = -1;
-
-      do {
-        int i = this.nextHostIndex.nextInt();
-
-        if (host == null) {
-          firstIndex = i;
-        } else if (i == firstIndex) {
-          // all urls exhausted
-          return Optional.empty();
-        }
-
-        host = this.startUrls[i];
-      } while (!isAcceptable(host) && this.nextHostIndex.hasNext());
-
-      return Optional.of(host);
+      return randomizedIndices(this.nextHostIndex.nextInt(), this.startUrls.length)
+          .map(i -> this.startUrls[i])
+          .filter(this::isAcceptable);
+    } else {
+      return Stream.empty();
     }
-    return Optional.empty();
+  }
+
+  // Maintains first index in order while shuffling the rest. This enables equal chance on URL
+  // crawls. The randomization later helps when a slice of the array is not to be crawled
+  // (for any reason), but would always resort to the next index after the slice until reached, if
+  // everything was kept in order. This would bring in delay due to continuous crawling of the same
+  // site.
+  //
+  // visible for testing
+  static Stream<Integer> randomizedIndices(final int start, final int length) {
+    return Stream.concat(
+            IntStream.range(start + 1, length).boxed(), IntStream.range(0, start).boxed())
+        .collect(
+            Collectors.collectingAndThen(
+                Collectors.toCollection(ArrayList::new),
+                c -> {
+                  Collections.shuffle(c);
+                  return Stream.concat(Stream.of(start), c.stream());
+                }));
   }
 
   // TODO: can be a common function with different sql commands
@@ -434,7 +449,11 @@ public class Manager
 
     try (var con = this.dataSource.getConnection()) {
 
-      try (var ps = con.prepareStatement("DELETE FROM domain_stats WHERE host = ? AND url = ?")) {
+      try (var ps =
+          con.prepareStatement(
+              """
+        DELETE FROM domain_stats WHERE host = ? AND url = ?
+        """)) {
         con.setAutoCommit(false);
 
         ps.setString(1, host.toString());

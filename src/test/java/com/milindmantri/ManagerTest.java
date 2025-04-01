@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -64,9 +65,16 @@ class ManagerTest {
   }
 
   @Test
+  void test() {
+    System.out.println(CrawlerRunner.URL_NORMALIZER.normalizeURL("http://google.com/hello#world"));
+  }
+
+  @Test
   void invalidLimit() {
     assertThrows(IllegalArgumentException.class, () -> new Manager(-1, datasource));
     assertThrows(IllegalArgumentException.class, () -> new Manager(-1, null));
+
+    System.out.println(ThreadLocalRandom.current().ints(21, 0, 21).boxed().toList());
   }
 
   @Test
@@ -313,7 +321,7 @@ class ManagerTest {
         new Manager(
             3, datasource, Stream.of("http://site1.com", "https://site2.com").map(URI::create));
 
-    assertTrue(dc.getNextHost().isEmpty());
+    assertFalse(dc.getNextHost().isEmpty());
   }
 
   @Test
@@ -1110,6 +1118,48 @@ class ManagerTest {
     dc.saveProcessed(URI.create("http://site.com/link1"), 0);
 
     assertFalse(dc.execute(context));
+  }
+
+  @Test
+  void randomizeIndices() {
+    assertEquals(2, Manager.randomizedIndices(2, 20).findFirst().get());
+
+    assertEquals(19, Manager.randomizedIndices(2, 20).skip(1).distinct().count());
+
+    assertTrue(
+        Manager.randomizedIndices(2, 20)
+            .skip(1)
+            .allMatch(i -> IntStream.range(0, 20).filter(j -> j != 2).anyMatch(j -> j == i)));
+
+    assertTrue(Manager.randomizedIndices(2, 20).skip(1).noneMatch(i -> i == 2));
+  }
+
+  @Test
+  void randomizeIndicesZero() {
+    assertEquals(0, Manager.randomizedIndices(0, 20).findFirst().get());
+
+    assertEquals(19, Manager.randomizedIndices(0, 20).skip(1).distinct().count());
+
+    assertTrue(
+        Manager.randomizedIndices(0, 20)
+            .skip(1)
+            .allMatch(i -> IntStream.range(0, 20).filter(j -> j != 0).anyMatch(j -> j == i)));
+
+    assertTrue(Manager.randomizedIndices(0, 20).skip(1).noneMatch(i -> i == 0));
+  }
+
+  @Test
+  void randomizeIndicesLast() {
+    assertEquals(19, Manager.randomizedIndices(19, 20).findFirst().get());
+
+    assertEquals(19, Manager.randomizedIndices(19, 20).skip(1).distinct().count());
+
+    assertTrue(
+        Manager.randomizedIndices(19, 20)
+            .skip(1)
+            .allMatch(i -> IntStream.range(0, 20).filter(j -> j != 19).anyMatch(j -> j == i)));
+
+    assertTrue(Manager.randomizedIndices(19, 20).skip(1).noneMatch(i -> i == 19));
   }
 
   static Host qEvent(String link) {
