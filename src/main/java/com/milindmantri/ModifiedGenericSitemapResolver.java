@@ -7,7 +7,6 @@ import com.norconex.collector.core.crawler.CrawlerEvent;
 import com.norconex.collector.core.crawler.CrawlerLifeCycleListener;
 import com.norconex.collector.core.doc.CrawlDoc;
 import com.norconex.collector.core.store.IDataStore;
-import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.doc.HttpDocInfo;
 import com.norconex.collector.http.fetch.HttpFetchClient;
 import com.norconex.collector.http.fetch.HttpMethod;
@@ -35,6 +34,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
 import javax.xml.stream.XMLStreamException;
@@ -50,34 +51,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Implementation of {@link ISitemapResolver} as per sitemap.xml standard defined at <a
- * href="http://www.sitemaps.org/protocol.html">http://www.sitemaps.org/protocol.html</a>.
- *
- * <p>Sitemaps are only resolved if they have not been resolved already for the same URL "root" (the
- * protocol, host and possible port).
- *
- * <p>The Sitemap specification dictates that a sitemap.xml file defined in a sub-directory applies
- * only to URLs found in that sub-directory and its children. This behavior is respected by default.
- * Setting lenient to <code>true</code> no longer honors this restriction.
- *
- * <p>Paths relative to URL roots can be specified and an attempt will be made to load and parse any
- * sitemap found at those locations for each root URLs encountered (except for "start URLs"
- * sitemaps, see below). Default paths are <code>/sitemap.xml</code> and <code>/sitemap_index.xml
- * </code>. Setting <code>null</code> or an empty path array on {@link #setSitemapPaths(String...)}
- * will prevent attempts to locate sitemaps and only sitemaps found in robots.txt or defined as
- * start URLs will be considered.
- *
- * <p>Sitemaps can be specified as "start URLs" (defined in {@link
- * HttpCrawlerConfig#getStartSitemapURLs()}). Sitemaps defined that way will be the only ones
- * resolved for the root URL they represent (sitemap paths or sitemaps defined in robots.txt won't
- * apply).
- *
- * <p>Sitemaps are first stored in a local temporary file before being parsed. A directory relative
- * to the crawler work directory will be created by default. To specify a custom directory, you can
- * use {@link #setTempDir(Path)}.
- *
- * @author Pascal Essiembre
- * @since 3.0.0 (merged fro StandardSitemapResolver*)
+ * This is a straight copy of GenericSitemapResolver from the norconex web crawler lib The only
+ * change here is the inclusion of an executor as argument which enables for parallel resolving of
+ * sitemap. In cases where the root sitemap refers to other child sitemaps, the initial sitemap
+ * resolution before crawling begins is too long. Resolution over an executor can provide a faster
+ * exit for parent sitemap resolutions and the crawling can begin. Meanwhile, further child sitemap
+ * resolution keeps happening in the background.
  */
 public class ModifiedGenericSitemapResolver extends CrawlerLifeCycleListener
     implements ISitemapResolver, IXMLConfigurable {
@@ -103,6 +82,13 @@ public class ModifiedGenericSitemapResolver extends CrawlerLifeCycleListener
   private boolean lenient;
   private boolean stopping;
   private final List<String> sitemapPaths = new ArrayList<>(DEFAULT_SITEMAP_PATHS);
+  private final ExecutorService executor;
+  private final Semaphore childSitemapSem;
+
+  public ModifiedGenericSitemapResolver(final ExecutorService executor, final Semaphore sem) {
+    this.executor = executor;
+    this.childSitemapSem = sem;
+  }
 
   @Override
   protected void onCrawlerRunBegin(CrawlerEvent event) {
@@ -389,7 +375,18 @@ public class ModifiedGenericSitemapResolver extends CrawlerLifeCycleListener
         // TODO handle lastmod to speed up re-crawling even further?
         String url = c.readAsXML().getString("loc");
         if (StringUtils.isNotBlank(url)) {
-          resolveSitemap(url, fetcher, sitemapURLConsumer, resolvedLocations);
+          executor.submit(
+              () -> {
+                try {
+                  this.childSitemapSem.acquire();
+                  resolveSitemap(url, fetcher, sitemapURLConsumer, resolvedLocations);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  throw new RuntimeException(e);
+                } finally {
+                  this.childSitemapSem.release();
+                }
+              });
         }
       } else if ("url".equalsIgnoreCase(c.getLocalName())) {
         HttpDocInfo doc = toDocInfo(c.readAsXML(), sitemapLocationDir);
