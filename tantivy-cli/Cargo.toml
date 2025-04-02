@@ -30,7 +30,6 @@ log = "0.4"
 env_logger = "0.10"
 tantivy = { git = "https://github.com/quickwit-oss/tantivy/", rev = "2f5a269" }
 crossbeam-channel = "0.5.8"
-tikv-jemallocator = "0.5"
 
 [[bin]]
 name = "tantivy"
