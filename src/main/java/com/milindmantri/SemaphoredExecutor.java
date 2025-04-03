@@ -15,13 +15,17 @@ public class SemaphoredExecutor {
   }
 
   public Future<?> submit(final Callable<?> c) {
-    try {
-      this.sem.acquire();
-      return this.exec.submit(c);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    } finally {
-      this.sem.release();
-    }
+
+    return this.exec.submit(
+        () -> {
+          try {
+            this.sem.acquire();
+            return c.call();
+          } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+          } finally {
+            this.sem.release();
+          }
+        });
   }
 }
