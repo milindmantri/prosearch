@@ -179,6 +179,7 @@ ExecStart=java \
             -Dcrwlr-max-memory-inst=30 \
             # crawler total cache
             -Dcrwlr-max-memory-pool=390 \
+            --enable-preview \
             -jar /opt/prosearch/run.jar
 Restart=always
 ```
