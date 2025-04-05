@@ -4,7 +4,6 @@ import com.norconex.collector.http.HttpCollectorConfig;
 import com.norconex.collector.http.crawler.HttpCrawlerConfig;
 import com.norconex.collector.http.crawler.URLCrawlScopeStrategy;
 import com.norconex.collector.http.link.impl.HtmlLinkExtractor;
-import com.norconex.collector.http.url.IURLNormalizer;
 import com.norconex.collector.http.url.impl.GenericURLNormalizer;
 import com.norconex.commons.lang.unit.DataUnit;
 import com.norconex.commons.lang.xml.XML;
@@ -24,7 +23,19 @@ public final class CrawlerRunner implements Runnable {
   private static final int PER_HOST_CRAWLING_LIMIT =
       Integer.parseInt(System.getProperty("per-host-crawling-limit", "10000"));
 
-  public static final IURLNormalizer URL_NORMALIZER = new GenericURLNormalizer();
+  public static final GenericURLNormalizer URL_NORMALIZER = new GenericURLNormalizer();
+
+  static {
+    URL_NORMALIZER.setNormalizations(
+        GenericURLNormalizer.Normalization.removeFragment,
+        GenericURLNormalizer.Normalization.removeDuplicateSlashes,
+        GenericURLNormalizer.Normalization.removeDotSegments,
+        GenericURLNormalizer.Normalization.lowerCaseSchemeHost,
+        GenericURLNormalizer.Normalization.upperCaseEscapeSequence,
+        GenericURLNormalizer.Normalization.decodeUnreservedCharacters,
+        GenericURLNormalizer.Normalization.removeDefaultPort,
+        GenericURLNormalizer.Normalization.encodeNonURICharacters);
+  }
 
   private final DataSource datasource;
   private final TantivyClient client;
