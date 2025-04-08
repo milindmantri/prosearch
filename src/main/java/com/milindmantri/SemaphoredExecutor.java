@@ -1,5 +1,6 @@
 package com.milindmantri;
 
+import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -20,7 +21,9 @@ public class SemaphoredExecutor {
         () -> {
           try {
             this.sem.acquire();
-            return c.call();
+            var ret = c.call();
+            Thread.sleep(Duration.ofSeconds(2));
+            return ret;
           } catch (InterruptedException e) {
             throw new RuntimeException(e);
           } finally {
