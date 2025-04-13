@@ -22,7 +22,7 @@ use persistent::Write;
 use serde_derive::Serialize;
 use serde_json::{Map, Value};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::From,
     error::Error,
     fmt::{self, Debug},
@@ -276,10 +276,8 @@ fn escape_tantivy_query(input: &str) -> String {
             for c in term.chars() {
                 match c {
                     '\\' | '"' | '\'' => {
-                        println!("{}", c);
                         escaped.push('\\');
                         escaped.push(c);
-                        println!("{}", escaped)
                     }
                     _ => {
                         escaped.push(c);
@@ -317,7 +315,8 @@ struct IndexServer {
     reader: IndexReader,
     query_parser: QueryParser,
     schema: Schema,
-    writer: IndexWriter
+    writer: IndexWriter,
+    boost_terms: HashSet<String>
 }
 
 impl IndexServer {
@@ -359,11 +358,21 @@ impl IndexServer {
         warmer.warm(&query_parser, &reader.searcher())?;
 
         let writer : IndexWriter = index.writer(50_000_000)?;
+
+        let set = HashSet::from(
+            ["angular","drupal","haxe","qunitjs", "qunit","babeljs", "babel","backbonejs", "backbone","bazel", "bluebirdjs", "bluebird","bower", "cfdocs", "cfml","clojure","clojure","codecept","codeception", "codeigniter", "coffeescript","cran.r-project", "r","crystal","dart","mysql","apple","mozilla", "mdn","wordpress","deno","astro","aws","amazon","brew","chef","cypress","influxdata", "influxdb","julialang", "julia","microsoft","npmjs", "npm","oracle","phalconphp", "phalcon","python", "python","rust","ruby","saltproject", "salt","wagtail","doctrine","embarcadero","eigen","elixir","elm","cpp", "c++","enzymejs", "enzyme","erights", "erlang","esbuild","eslint","expressjs", "express","fastapi","flow","fortran90", "fortran","fsharp","bootstrap","composer","git","gnu","cobol","go","golang","handlebarsjs", "handlebars","haskell","hex","hexdocs","httpd", "apache","i3wm", "i3","jasmine","javascript","jekyllrb", "jekyll","jsdoc","julialang", "julia","knockoutjs", "knockout","kotlinlang", "kotlin","laravel","latexref", "latex","lesscss", "less","love2d","lua","man7", "linux","mariadb","mochajs", "mocha","modernizr","momentjs", "moment","mongoosejs", "mongoose","vue","vuex","nginx","nim","nixos","node", "nodejs","npmjs", "npm","ocaml","odin","openjdk","opentsdb","perl","php","playwright","pointclouds","postgresql","prettier","pugjs", "pug","pydata","pytorch","qt","r-project","react-bootstrap", "react","reactivex", "rxjs","reactjs", "react","reactnative", "reactrouter","readthedocs","redis","redux.js", "redux","requirejs","rethinkdb","ruby","rust-lang", "rust","rxjs","sass","scala","scikit-image","scikit-learn", "scikit","spring","sqlite","ponylang", "pony","superuser","svelte","swift","tailwindcss", "tailwind","symfony", "twig","typescript","underscorejs", "underscore","vitejs", "vite","vitest","vuejs", "vue","vueuse","webpack.js", "webpack","arch","chaijs", "chai","electronjs", "electron","gnu","hammerspoon","khronos","lua","pygame","rubydoc","statsmodels","tcl","terraform","vagrantup", "vagrant","yiiframework", "yii","yarnpkg", "yarn"]
+            .map( |s: &str| {
+                let mut str = String::new();
+                str.push_str(s);
+                str
+            })
+        );
         Ok(IndexServer {
             reader,
             query_parser,
             schema,
-            writer
+            writer,
+            boost_terms: set
         })
     }
 
@@ -377,9 +386,27 @@ impl IndexServer {
     }
 
     fn search(&self, q: String, num_hits: usize, _offset: usize) -> tantivy::Result<Serp> {
+        let quoted_boosted = q
+            .split_whitespace()
+            .map( |s| {
+                let key = String::from(s);
+                if self.boost_terms.contains(&key) {
+                    let mut boosted = String::new();
+                    let escaped = escape_tantivy_query(s);
+                    boosted.push_str(&escaped);
+                    boosted.push_str("^2.5");
+
+                    boosted
+                } else {
+                    escape_tantivy_query(&s)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+
         let (query, _err) = self
             .query_parser
-            .parse_query_lenient(&escape_tantivy_query(&q));
+            .parse_query_lenient(&quoted_boosted);
 
         let searcher = self.reader.searcher();
         let mut timer_tree = TimerTree::default();
@@ -398,7 +425,7 @@ impl IndexServer {
                     let doc = searcher.doc::<TantivyDocument>(*doc_address).unwrap();
                     let body_field = self.schema.get_field("body").unwrap();
 
-                    let snippet : String = 
+                    let snippet : String =
                         self
                             .gen_html_snippet(&doc, &searcher, &*query, body_field)
                             .to_html();
