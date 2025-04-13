@@ -150,7 +150,7 @@ public class SearchPage {
   private static Html divFromSearchResult(final TantivyClient.SearchResult res) {
     return Html.div(
         Stream.of(
-            Html.a(res.url(), true, Stream.of(Html.h3(res.title()))),
+            Html.a(res.url(), true, Stream.of(Html.h3(StringEscapeUtils.escapeHtml4(res.title())))),
             Html.a(res.url(), true, Stream.of(Html.span(StringEscapeUtils.escapeHtml4(res.url())))),
             Html.p(res.snippet())));
   }
