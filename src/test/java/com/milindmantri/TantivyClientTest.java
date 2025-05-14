@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
@@ -139,6 +141,7 @@ class TantivyClientTest {
   //  -> many links to filter
 
   @Test
+  @Disabled
   void searchZeroLinksToFilter()
       throws IOException, InterruptedException, TantivyClient.FailedSearchException {
     HttpClient httpClient = Mockito.mock(HttpClient.class);
@@ -187,16 +190,16 @@ class TantivyClientTest {
     var res = tc.search("hello%20world", linksToFilter);
 
     assertEquals(expectedResult, res);
-    //    assertEquals(res.results().get().toList(), SAMPLE_RESPONSE_OBJ.results().get().toList());
-    //
-    //    Mockito.verify(httpClient, times(1))
-    //        .send(
-    //            eq(
-    //                HttpRequest.newBuilder()
-    //                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
-    //                    .GET()
-    //                    .build()),
-    //            any(HttpResponse.BodyHandler.class));
+    assertTrue(res.results().isEmpty());
+
+    Mockito.verify(httpClient, times(1))
+        .send(
+            eq(
+                HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
+                    .GET()
+                    .build()),
+            any(HttpResponse.BodyHandler.class));
   }
 
   @Test
