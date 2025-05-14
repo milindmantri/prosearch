@@ -34,6 +34,7 @@ public class TantivyClient {
 
   public record SearchResult(String title, String snippet, String url) {}
 
+  // TODO: Why optional of stream
   public record SearchResultWithLatency(Optional<Stream<SearchResult>> results, Duration latency) {
 
     // soft equals, does not compare streams
@@ -98,8 +99,8 @@ public class TantivyClient {
     }
   }
 
-
-  SearchResultWithLatency search(final String term, final List<URI> filter) throws IOException, InterruptedException, FailedSearchException {
+  SearchResultWithLatency search(final String term, final List<URI> filter)
+      throws IOException, InterruptedException, FailedSearchException {
     return search(term);
   }
 

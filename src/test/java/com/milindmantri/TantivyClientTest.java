@@ -138,10 +138,9 @@ class TantivyClientTest {
   //  -> one link to filter
   //  -> many links to filter
 
-
   @Test
   void searchZeroLinksToFilter()
-          throws IOException, InterruptedException, TantivyClient.FailedSearchException {
+      throws IOException, InterruptedException, TantivyClient.FailedSearchException {
     HttpClient httpClient = Mockito.mock(HttpClient.class);
     URI host = URI.create("http://localhost");
     var tc = new TantivyClient(httpClient, host);
@@ -157,13 +156,47 @@ class TantivyClientTest {
     assertEquals(res.results().get().toList(), SAMPLE_RESPONSE_OBJ.results().get().toList());
 
     Mockito.verify(httpClient, times(1))
-            .send(
-                    eq(
-                            HttpRequest.newBuilder()
-                                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
-                                    .GET()
-                                    .build()),
-                    any(HttpResponse.BodyHandler.class));
+        .send(
+            eq(
+                HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
+                    .GET()
+                    .build()),
+            any(HttpResponse.BodyHandler.class));
+  }
+
+  @Test
+  void searchOneLinkToFilter()
+      throws IOException, InterruptedException, TantivyClient.FailedSearchException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn(SAMPLE_JSON_RESPONSE);
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
+
+    List<URI> linksToFilter = List.of(URI.create("https://example.com"));
+
+    var expectedResult =
+        new TantivyClient.SearchResultWithLatency(
+            Optional.of(Stream.empty()), SAMPLE_RESPONSE_OBJ.latency());
+
+    var res = tc.search("hello%20world", linksToFilter);
+
+    assertEquals(expectedResult, res);
+    //    assertEquals(res.results().get().toList(), SAMPLE_RESPONSE_OBJ.results().get().toList());
+    //
+    //    Mockito.verify(httpClient, times(1))
+    //        .send(
+    //            eq(
+    //                HttpRequest.newBuilder()
+    //                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
+    //                    .GET()
+    //                    .build()),
+    //            any(HttpResponse.BodyHandler.class));
   }
 
   @Test
