@@ -10,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -95,6 +96,11 @@ public class TantivyClient {
     } else {
       throw new FailedSearchException(term);
     }
+  }
+
+
+  SearchResultWithLatency search(final String term, final List<URI> filter) throws IOException, InterruptedException, FailedSearchException {
+    return search(term);
   }
 
   boolean delete(final URI uri) throws IOException, InterruptedException {

@@ -15,6 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -136,7 +137,34 @@ class TantivyClientTest {
   // get search results -> given a set of links to filter -> filter search results
   //  -> one link to filter
   //  -> many links to filter
-  // if there are no links to filter -> return as is (ZERO)
+
+
+  @Test
+  void searchZeroLinksToFilter()
+          throws IOException, InterruptedException, TantivyClient.FailedSearchException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn(SAMPLE_JSON_RESPONSE);
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
+
+    var res = tc.search("hello%20world", List.of());
+    assertEquals(SAMPLE_RESPONSE_OBJ, res);
+    assertEquals(res.results().get().toList(), SAMPLE_RESPONSE_OBJ.results().get().toList());
+
+    Mockito.verify(httpClient, times(1))
+            .send(
+                    eq(
+                            HttpRequest.newBuilder()
+                                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
+                                    .GET()
+                                    .build()),
+                    any(HttpResponse.BodyHandler.class));
+  }
 
   @Test
   void searchEncoded()
