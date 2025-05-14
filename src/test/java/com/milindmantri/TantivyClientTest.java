@@ -202,6 +202,80 @@ class TantivyClientTest {
   }
 
   @Test
+  void filterAllSearchResultsWithMultipleFilters()
+          throws IOException, InterruptedException, TantivyClient.FailedSearchException {
+    HttpClient httpClient = Mockito.mock(HttpClient.class);
+    URI host = URI.create("http://localhost");
+    var tc = new TantivyClient(httpClient, host);
+
+    var multipleLinksResult =
+            """
+            {
+              "q": "abc",
+              "hits": [
+              {
+                "doc": {
+                 "title": [
+                   "Example Title"
+                 ],
+                 "url": [
+                   "https://example.com"
+                 ]
+               },
+               "snip": "Snippet"
+             },              
+             {
+                "doc": {
+                 "title": [
+                   "Example Title"
+                 ],
+                 "url": [
+                   "https://example-2.com"
+                 ]
+               },
+               "snip": "Snippet"
+             }
+             ],
+              "timings": {
+                "timings": [
+                  {
+                    "name": "search",
+                    "duration": 638,
+                    "depth": 0
+                  }
+                ]
+              }
+            }
+            """;
+
+    HttpResponse<String> response = Mockito.mock(HttpResponse.class);
+    when(response.body()).thenReturn(multipleLinksResult);
+    when(response.statusCode()).thenReturn(HttpURLConnection.HTTP_OK);
+
+    Mockito.when(httpClient.<String>send(any(), any())).thenReturn(response);
+
+    List<URI> linksToFilter = List.of(URI.create("https://example.com"), URI.create("https://example-2.com"));
+
+    var expectedResult =
+            new TantivyClient.SearchResultWithLatency(
+                    Optional.of(Stream.empty()), SAMPLE_RESPONSE_OBJ.latency());
+
+    var res = tc.search("hello%20world", linksToFilter);
+
+    assertEquals(expectedResult, res);
+    assertTrue(res.results().get().findAny().isEmpty());
+
+    Mockito.verify(httpClient, times(1))
+            .send(
+                    eq(
+                            HttpRequest.newBuilder()
+                                    .uri(URI.create("http://localhost/api/?q=hello%20world"))
+                                    .GET()
+                                    .build()),
+                    any(HttpResponse.BodyHandler.class));
+  }
+
+  @Test
   void searchEncoded()
       throws IOException, InterruptedException, TantivyClient.FailedSearchException {
     HttpClient httpClient = Mockito.mock(HttpClient.class);
