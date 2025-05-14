@@ -132,6 +132,12 @@ class TantivyClientTest {
     assertThrows(IllegalArgumentException.class, () -> tc.search("search term"));
   }
 
+  // TODO:
+  // get search results -> given a set of links to filter -> filter search results
+  //  -> one link to filter
+  //  -> many links to filter
+  // if there are no links to filter -> return as is (ZERO)
+
   @Test
   void searchEncoded()
       throws IOException, InterruptedException, TantivyClient.FailedSearchException {
