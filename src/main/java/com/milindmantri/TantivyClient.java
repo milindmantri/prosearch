@@ -101,7 +101,7 @@ public class TantivyClient {
 
   SearchResultWithLatency search(final String term, final List<URI> filter)
       throws IOException, InterruptedException, FailedSearchException {
-    return search(term);
+    return search(term).results().map(stream -> stream.filter(result -> result.url));
   }
 
   boolean delete(final URI uri) throws IOException, InterruptedException {
