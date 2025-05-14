@@ -189,7 +189,7 @@ class TantivyClientTest {
     var res = tc.search("hello%20world", linksToFilter);
 
     assertEquals(expectedResult, res);
-    assertTrue(res.results().isEmpty());
+    assertTrue(res.results().get().findAny().isEmpty());
 
     Mockito.verify(httpClient, times(1))
         .send(
